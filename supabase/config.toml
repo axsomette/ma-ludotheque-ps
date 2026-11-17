@@ -1,8 +1,11 @@
 # Configuration Supabase CLI (utile pour `supabase link`, `db push` et `functions deploy`).
 project_id = "ma-ludotheque-ps"
 
+# verify_jwt = false : la passerelle ne sait pas vérifier les jetons signés avec les nouvelles
+# clés asymétriques. Chaque fonction vérifie elle-même la session (auth.getUser) et refuse
+# les appels anonymes (401).
 [functions.search-cover]
-verify_jwt = true
+verify_jwt = false
 
 [functions.save-cover]
-verify_jwt = true
+verify_jwt = false

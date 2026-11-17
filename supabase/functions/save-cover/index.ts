@@ -2,7 +2,43 @@
 // (covers/<user_id>/igdb-<image_id>.jpg) et renvoie son URL publique.
 // Avoir sa propre copie évite les blocages CORS au moment de l'afficher en texture 3D.
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { corsHeaders, json } from "../_shared/http.ts";
+
+// --- CORS et réponses JSON (intégrés pour un déploiement en un seul fichier) ---
+
+const allowed = (Deno.env.get("ALLOWED_ORIGINS") ?? "http://localhost:5173")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+function corsHeaders(req: Request): HeadersInit {
+  const origin = req.headers.get("origin") ?? "";
+  return {
+    "Access-Control-Allow-Origin": allowed.includes(origin) ? origin : allowed[0],
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    Vary: "Origin",
+  };
+}
+
+function json(req: Request, body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+  });
+}
+
+/** Clé publique du projet : nouvelle clé « publishable » si présente, sinon l'ancienne clé anon. */
+function publicKey(): string {
+  try {
+    const keys = JSON.parse(Deno.env.get("SUPABASE_PUBLISHABLE_KEYS") ?? "{}");
+    const k = keys.default ?? Object.values(keys)[0];
+    if (typeof k === "string" && k) return k;
+  } catch {
+    // variable absente ou illisible : on retombe sur l'ancienne clé
+  }
+  return Deno.env.get("SUPABASE_ANON_KEY")!;
+}
+
 
 const MAX_BYTES = 5 * 1024 * 1024;
 
@@ -12,7 +48,7 @@ Deno.serve(async (req) => {
 
   try {
     // Client agissant au nom de l'utilisateur : les règles RLS du stockage s'appliquent.
-    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, publicKey(), {
       global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
     });
     const { data: auth, error: authError } = await supabase.auth.getUser();

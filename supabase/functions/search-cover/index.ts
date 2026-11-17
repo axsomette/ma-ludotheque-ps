@@ -1,6 +1,45 @@
 // Recherche de jaquettes dans la base IGDB (Twitch), filtrée par plateforme PlayStation.
 // Les identifiants Twitch restent côté serveur (secrets Supabase), jamais dans le navigateur.
-import { corsHeaders, json } from "../_shared/http.ts";
+// Réservée aux utilisateurs connectés (protège le quota IGDB) : la session est vérifiée ici,
+// car la vérification « verify_jwt » de la passerelle ne gère pas les nouvelles clés de signature.
+import { createClient } from "jsr:@supabase/supabase-js@2";
+
+// --- CORS et réponses JSON (intégrés pour un déploiement en un seul fichier) ---
+
+const allowed = (Deno.env.get("ALLOWED_ORIGINS") ?? "http://localhost:5173")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+function corsHeaders(req: Request): HeadersInit {
+  const origin = req.headers.get("origin") ?? "";
+  return {
+    "Access-Control-Allow-Origin": allowed.includes(origin) ? origin : allowed[0],
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    Vary: "Origin",
+  };
+}
+
+function json(req: Request, body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+  });
+}
+
+/** Clé publique du projet : nouvelle clé « publishable » si présente, sinon l'ancienne clé anon. */
+function publicKey(): string {
+  try {
+    const keys = JSON.parse(Deno.env.get("SUPABASE_PUBLISHABLE_KEYS") ?? "{}");
+    const k = keys.default ?? Object.values(keys)[0];
+    if (typeof k === "string" && k) return k;
+  } catch {
+    // variable absente ou illisible : on retombe sur l'ancienne clé
+  }
+  return Deno.env.get("SUPABASE_ANON_KEY")!;
+}
+
 
 const IGDB_PLATFORM: Record<string, number> = { ps3: 9, ps4: 48, ps5: 167 };
 
@@ -47,6 +86,12 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json(req, { error: "POST attendu" }, 405);
 
   try {
+    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, publicKey(), {
+      global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
+    });
+    const { data: auth, error: authError } = await supabase.auth.getUser();
+    if (authError || !auth.user) return json(req, { error: "Non connecté" }, 401);
+
     const { query, platform } = await req.json();
     const q = String(query ?? "")
       .replace(/["\\;]/g, " ") // pas d'injection dans la requête APIcalypse

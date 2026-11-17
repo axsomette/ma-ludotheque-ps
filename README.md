@@ -44,7 +44,7 @@ Sans configuration, l'appli démarre en **mode démo** : la collection reste dan
 ### 2. Jaquettes (IGDB)
 
 1. Créer une application sur [dev.twitch.tv/console](https://dev.twitch.tv/console) (gratuit), de type « Confidential ».
-2. Déclarer les secrets des fonctions, puis les déployer :
+2. Déclarer les secrets des fonctions (Edge Functions → Secrets, ou en ligne de commande), puis déployer les fonctions :
    ```bash
    supabase secrets set TWITCH_CLIENT_ID=xxx TWITCH_CLIENT_SECRET=yyy ALLOWED_ORIGINS=https://<compte>.github.io,http://localhost:5173
    ```
@@ -54,11 +54,14 @@ Sans configuration, l'appli démarre en **mode démo** : la collection reste dan
    ```bash
    supabase functions deploy save-cover
    ```
+   Chaque fonction tient en un seul fichier : on peut aussi la coller dans l'éditeur du tableau de bord.
+   Désactiver **« Verify JWT with legacy secret »** sur les deux (déjà fait par `config.toml` avec la CLI) :
+   avec les nouvelles clés de signature, c'est la fonction qui vérifie elle-même la session et renvoie 401 sinon.
 
 ### 3. GitHub Pages
 
 1. Settings → Pages → Source : **GitHub Actions**.
-2. Settings → Secrets and variables → Actions → **Variables** : renseigner `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY`. Ce sont des valeurs publiques par conception : la sécurité repose sur les règles RLS.
+2. Settings → Secrets and variables → Actions → **Variables** : renseigner `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY` (la clé « publishable » `sb_publishable_…`, ou l'ancienne clé anon). Ce sont des valeurs publiques par conception : la sécurité repose sur les règles RLS.
 3. Pousser sur `main`. Le workflow `Déploiement GitHub Pages` compile et publie.
 
 ## Développement local
@@ -80,7 +83,7 @@ Sans `.env.local`, l'appli démarre en mode démo.
 - Aucun secret dans le dépôt. Les clés Twitch vivent dans les secrets Supabase, et `.env.local` est ignoré par git.
 - RLS sur `games` et sur le stockage : un utilisateur ne lit et n'écrit que ses données, et seulement dans `covers/<son id>/`.
 - `save-cover` ne télécharge que depuis le CDN d'IGDB, avec un identifiant d'image strictement validé.
-- Les deux fonctions exigent un utilisateur connecté (`verify_jwt`), ce qui protège le quota IGDB.
+- Les deux fonctions exigent un utilisateur connecté (session vérifiée dans la fonction, 401 sinon), ce qui protège le quota IGDB.
 
 ## Limites connues
 
