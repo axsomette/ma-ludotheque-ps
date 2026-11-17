@@ -40,6 +40,12 @@ on conflict (id) do update set public = excluded.public,
   file_size_limit = excluded.file_size_limit,
   allowed_mime_types = excluded.allowed_mime_types;
 
+-- Lecture via l'API (nécessaire au dépôt en mode upsert de save-cover).
+drop policy if exists "covers: lecture de son dossier" on storage.objects;
+create policy "covers: lecture de son dossier" on storage.objects
+  for select to authenticated
+  using (bucket_id = 'covers' and (storage.foldername(name))[1] = (select auth.uid())::text);
+
 drop policy if exists "covers: dépôt dans son dossier" on storage.objects;
 create policy "covers: dépôt dans son dossier" on storage.objects
   for insert to authenticated

@@ -1,4 +1,5 @@
-// Recherche de jaquettes dans la base IGDB (Twitch), filtrée par plateforme PlayStation.
+// Recherche de jeux dans la base IGDB (Twitch), filtrée par plateforme PlayStation.
+// Renvoie la jaquette et de quoi composer un dos réaliste : résumé, éditeur, genres, captures, PEGI.
 // Les identifiants Twitch restent côté serveur (secrets Supabase), jamais dans le navigateur.
 // Réservée aux utilisateurs connectés (protège le quota IGDB) : la session est vérifiée ici,
 // car la vérification « verify_jwt » de la passerelle ne gère pas les nouvelles clés de signature.
@@ -40,6 +41,7 @@ function publicKey(): string {
   return Deno.env.get("SUPABASE_ANON_KEY")!;
 }
 
+// --- IGDB ---
 
 const IGDB_PLATFORM: Record<string, number> = { ps3: 9, ps4: 48, ps5: 167 };
 
@@ -60,14 +62,8 @@ async function igdbToken(): Promise<string> {
   return token.value;
 }
 
-interface IgdbGame {
-  id: number;
-  name: string;
-  first_release_date?: number;
-  cover?: { image_id: string };
-}
-
-async function igdb(body: string): Promise<IgdbGame[]> {
+// deno-lint-ignore no-explicit-any
+async function igdb(body: string): Promise<any[]> {
   const r = await fetch("https://api.igdb.com/v4/games", {
     method: "POST",
     headers: {
@@ -77,8 +73,49 @@ async function igdb(body: string): Promise<IgdbGame[]> {
     },
     body,
   });
-  if (!r.ok) throw new Error(`IGDB ${r.status}`);
+  if (!r.ok) throw new Error(`IGDB ${r.status} ${await r.text().catch(() => "")}`.trim());
   return await r.json();
+}
+
+const PEGI_WORDS: Record<string, number> = { three: 3, seven: 7, twelve: 12, sixteen: 16, eighteen: 18 };
+const PEGI_LEGACY: Record<number, number> = { 1: 3, 2: 7, 3: 12, 4: 16, 5: 18 };
+
+/** Lit l'âge PEGI quel que soit le schéma IGDB (récent : organization/rating_category ; ancien : category/rating). */
+// deno-lint-ignore no-explicit-any
+function pegiOf(ratings: any[] | undefined): number | null {
+  for (const a of ratings ?? []) {
+    const org = String(a?.organization?.name ?? a?.organization ?? "");
+    const label = String(a?.rating_category?.rating ?? "");
+    if (/pegi/i.test(org) || a?.organization === 2) {
+      const n = Number(label.match(/\d+/)?.[0]);
+      if ([3, 7, 12, 16, 18].includes(n)) return n;
+      const w = PEGI_WORDS[label.toLowerCase()];
+      if (w) return w;
+    }
+    if (a?.category === 2 && PEGI_LEGACY[a?.rating]) return PEGI_LEGACY[a.rating];
+  }
+  return null;
+}
+
+/** Classification PEGI par jeu : non bloquante (schéma récent puis ancien, erreurs ignorées). */
+async function pegiFor(ids: number[]): Promise<Map<number, number>> {
+  const out = new Map<number, number>();
+  if (!ids.length) return out;
+  const where = `where id = (${ids.join(",")}); limit ${ids.length};`;
+  for (const fields of [
+    "fields age_ratings.organization.name,age_ratings.rating_category.rating;",
+    "fields age_ratings.category,age_ratings.rating;",
+  ]) {
+    try {
+      for (const g of await igdb(`${fields} ${where}`)) {
+        const p = pegiOf(g.age_ratings);
+        if (p && !out.has(g.id)) out.set(g.id, p);
+      }
+    } catch (e) {
+      console.warn("PEGI ignoré :", (e as Error).message);
+    }
+  }
+  return out;
 }
 
 Deno.serve(async (req) => {
@@ -101,20 +138,31 @@ Deno.serve(async (req) => {
     const pid = IGDB_PLATFORM[String(platform)];
     if (!q || !pid) return json(req, { error: "query et platform (ps3|ps4|ps5) requis" }, 400);
 
-    const fields = "fields name,cover.image_id,first_release_date;";
+    const fields =
+      "fields name,cover.image_id,first_release_date,summary,genres.name,screenshots.image_id," +
+      "involved_companies.publisher,involved_companies.company.name;";
     let games = await igdb(`search "${q}"; ${fields} where platforms = (${pid}) & cover != null; limit 12;`);
     // Rien sur cette plateforme (titre mal lu, portage…) : on élargit à toutes les plateformes.
     if (games.length === 0) games = await igdb(`search "${q}"; ${fields} where cover != null; limit 12;`);
+    games = games.filter((g) => g.cover?.image_id);
 
-    const results = games
-      .filter((g) => g.cover?.image_id)
-      .map((g) => ({
-        igdb_id: g.id,
-        name: g.name,
-        year: g.first_release_date ? new Date(g.first_release_date * 1000).getUTCFullYear() : null,
-        image_id: g.cover!.image_id,
-        thumb_url: `https://images.igdb.com/igdb/image/upload/t_cover_big/${g.cover!.image_id}.jpg`,
-      }));
+    const pegi = await pegiFor(games.map((g) => g.id));
+
+    const results = games.map((g) => ({
+      igdb_id: g.id,
+      name: g.name,
+      year: g.first_release_date ? new Date(g.first_release_date * 1000).getUTCFullYear() : null,
+      image_id: g.cover.image_id,
+      thumb_url: `https://images.igdb.com/igdb/image/upload/t_cover_big/${g.cover.image_id}.jpg`,
+      summary: typeof g.summary === "string" ? g.summary.slice(0, 1500) : null,
+      // deno-lint-ignore no-explicit-any
+      publisher: (g.involved_companies ?? []).find((c: any) => c.publisher)?.company?.name ?? null,
+      // deno-lint-ignore no-explicit-any
+      genres: (g.genres ?? []).map((x: any) => x.name).filter(Boolean).slice(0, 3),
+      // deno-lint-ignore no-explicit-any
+      screenshot_ids: (g.screenshots ?? []).map((s: any) => s.image_id).filter(Boolean).slice(0, 3),
+      pegi: pegi.get(g.id) ?? null,
+    }));
     return json(req, { results });
   } catch (e) {
     console.error(e);
