@@ -47,19 +47,14 @@ export const IconTrash = (p: P) => (
     <path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13" />
   </svg>
 );
-/** Étagère : tranches debout sur une planche. */
-export const IconShelf = (p: P) => (
+export const IconChevron = (p: P) => (
   <svg {...base(p)}>
-    <path d="M3 20h18M6 20V6M9.5 20V4M13 20V7M16.5 20l2-12" />
+    <path d="M9 5l7 7-7 7" />
   </svg>
 );
-/** Vitrine : jaquettes de face. */
-export const IconGrid = (p: P) => (
+export const IconLogout = (p: P) => (
   <svg {...base(p)}>
-    <rect x="4" y="4" width="7" height="8.5" rx="1" />
-    <rect x="13" y="4" width="7" height="8.5" rx="1" />
-    <rect x="4" y="14.5" width="7" height="5.5" rx="1" />
-    <rect x="13" y="14.5" width="7" height="5.5" rx="1" />
+    <path d="M14 4h5v16h-5M10 8l-4 4 4 4M6 12h10" />
   </svg>
 );
 /** Boîtier vu de face. */

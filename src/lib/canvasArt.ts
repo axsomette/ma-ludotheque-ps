@@ -3,7 +3,7 @@ import { mix, pegiColor, readableOn, wrapText } from "./artUtils";
 import { PLATFORMS } from "./platforms";
 import type { Game, Platform } from "./types";
 
-const DISPLAY = "Archivo, system-ui, sans-serif";
+const DISPLAY = "\"Chakra Petch\", system-ui, sans-serif";
 const MONO = "'JetBrains Mono', ui-monospace, monospace";
 
 /** Charge une image distante utilisable dans un canvas (CORS). */
@@ -21,7 +21,7 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
 export async function fontsReady(): Promise<void> {
   try {
     await Promise.all([
-      document.fonts.load(`800 48px ${DISPLAY}`),
+      document.fonts.load(`700 48px ${DISPLAY}`),
       document.fonts.load(`500 24px ${DISPLAY}`),
       document.fonts.load(`500 20px ${MONO}`),
     ]);
@@ -56,7 +56,7 @@ function drawPegi(ctx: CanvasRenderingContext2D, pegi: Game["pegi"], x: number, 
   ctx.fill();
   ctx.fillStyle = "#fff";
   ctx.textAlign = "center";
-  ctx.font = `800 ${size * 0.5}px ${DISPLAY}`;
+  ctx.font = `700 ${size * 0.5}px ${DISPLAY}`;
   ctx.fillText(String(pegi), x + size / 2, y + size * 0.6);
   ctx.font = `700 ${size * 0.17}px ${DISPLAY}`;
   ctx.fillText("PEGI", x + size / 2, y + size * 0.88);
@@ -69,7 +69,7 @@ function drawBand(ctx: CanvasRenderingContext2D, platform: Platform, w: number, 
   ctx.fillStyle = p.bandColor;
   ctx.fillRect(0, 0, w, h);
   ctx.fillStyle = p.bandText;
-  ctx.font = `800 ${h * 0.5}px ${DISPLAY}`;
+  ctx.font = `700 ${h * 0.5}px ${DISPLAY}`;
   ctx.fillText(p.label, h * 0.35, h * 0.68);
 }
 
@@ -95,7 +95,7 @@ export function generatedCover(title: string, platform: Platform): string {
   ctx.fillRect(0, 0, W, H);
   drawBand(ctx, platform, W, 62);
   ctx.fillStyle = "#fff";
-  ctx.font = `800 54px ${DISPLAY}`;
+  ctx.font = `700 54px ${DISPLAY}`;
   ctx.shadowColor = "rgba(0,0,0,.45)";
   ctx.shadowBlur = 18;
   const lines = wrapText(title.toUpperCase(), W - 72, (s) => ctx.measureText(s).width, 4);
@@ -119,7 +119,7 @@ export function spineTexture(game: Game, base: string): HTMLCanvasElement {
   ctx.fillStyle = p.bandColor;
   ctx.fillRect(0, 0, W, 150);
   ctx.fillStyle = p.bandText;
-  ctx.font = `800 34px ${DISPLAY}`;
+  ctx.font = `700 34px ${DISPLAY}`;
   ctx.textAlign = "center";
   ctx.fillText(p.label, W / 2, 92);
   const ink = readableOn(base);
@@ -128,7 +128,7 @@ export function spineTexture(game: Game, base: string): HTMLCanvasElement {
   ctx.rotate(Math.PI / 2);
   ctx.fillStyle = ink;
   ctx.textAlign = "left";
-  ctx.font = `800 40px ${DISPLAY}`;
+  ctx.font = `700 40px ${DISPLAY}`;
   const [line] = wrapText(game.title.toUpperCase(), H - 380, (s) => ctx.measureText(s).width, 1);
   ctx.fillText(line ?? "", 0, 0);
   ctx.restore();
@@ -174,7 +174,7 @@ export async function backCover(game: Game, tint: string): Promise<HTMLCanvasEle
 
   const pad = 64;
   ctx.fillStyle = "#fff";
-  ctx.font = `800 64px ${DISPLAY}`;
+  ctx.font = `700 64px ${DISPLAY}`;
   const titleLines = wrapText(game.title.toUpperCase(), W - pad * 2, (s) => ctx.measureText(s).width, 2);
   titleLines.forEach((l, i) => ctx.fillText(l, pad, 190 + i * 70));
   let y = 190 + (titleLines.length - 1) * 70 + 42;
@@ -283,7 +283,7 @@ export async function discLabel(game: Game): Promise<HTMLCanvasElement> {
   ctx.fillRect(0, bandTop, S, S - bandTop);
   ctx.fillStyle = p.bandText;
   ctx.textAlign = "center";
-  ctx.font = `800 64px ${DISPLAY}`;
+  ctx.font = `700 64px ${DISPLAY}`;
   ctx.fillText(p.label, R, bandTop + 92);
   if (game.pegi) drawPegi(ctx, game.pegi, R + 230, bandTop + 26, 92);
   ctx.textAlign = "left";

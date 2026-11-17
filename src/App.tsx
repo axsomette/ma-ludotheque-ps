@@ -1,11 +1,13 @@
 import type { Session } from "@supabase/supabase-js";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { AddGame } from "./components/AddGame";
-import { IconGrid, IconPlus, IconSearch, IconShelf } from "./components/icons";
+import type { CaseMode } from "./components/GameCase3D";
+import { IconLogout, IconPlus, IconSearch } from "./components/icons";
+import { Backdrop, CaseGrid, EmptyLibrary, Hero, LibrarySkeleton, Rail, useTint } from "./components/Library";
 import { Login } from "./components/Login";
 import { DiscSpinner, Logo } from "./components/Logo";
-import { EmptyShelf, Shelf, ShelfSkeleton, type ShelfView } from "./components/Shelf";
 import { generatedCover } from "./lib/canvasArt";
+import { mix } from "./lib/artUtils";
 import { PLATFORMS, PLATFORM_ORDER } from "./lib/platforms";
 import { addGame, deleteGame, listGames } from "./lib/store";
 import { isDemo, supabase } from "./lib/supabase";
@@ -20,15 +22,6 @@ const DEMO_SEED: Array<Pick<NewGame, "title" | "platform" | "release_year" | "pe
   { title: "Les Terres d'Aube", platform: "ps4", release_year: 2019, pegi: 16, genres: ["Aventure", "RPG"], publisher: "Studio Démo", summary: "Jeu de démonstration : un voyage au long cours vers l'aube." },
   { title: "Canyon Run", platform: "ps3", release_year: 2011, pegi: 12, genres: ["Action"], publisher: "Studio Démo", summary: "Jeu de démonstration : une course-poursuite dans les canyons." },
 ];
-
-const VIEW_KEY = "ludotheque-vue";
-function readView(): ShelfView {
-  try {
-    return localStorage.getItem(VIEW_KEY) === "covers" ? "covers" : "spines";
-  } catch {
-    return "spines";
-  }
-}
 
 let seededInMemory = false;
 function demoSeeded(): boolean {
@@ -55,10 +48,11 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Platform | "all">("all");
   const [q, setQ] = useState("");
-  const [view, setView] = useState<ShelfView>(readView);
   // Raccourci de l'icône d'appli (« Ranger un jeu ») : ?ajouter=1 ouvre directement l'ajout.
   const [adding, setAdding] = useState(() => new URLSearchParams(window.location.search).has("ajouter"));
-  const [viewing, setViewing] = useState<Game | null>(null);
+  const [viewing, setViewing] = useState<{ game: Game; mode: CaseMode } | null>(null);
+  // Jeu mis en avant sur l'accueil : celui qu'on survole, qu'on parcourt au clavier ou qu'on a ouvert en dernier.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!supabase) return;
@@ -108,14 +102,15 @@ export default function App() {
     return games.filter((g) => (filter === "all" || g.platform === filter) && (!needle || g.title.toLowerCase().includes(needle)));
   }, [games, filter, q]);
 
-  function changeView(v: ShelfView) {
-    setView(v);
-    try {
-      localStorage.setItem(VIEW_KEY, v);
-    } catch {
-      // préférence non mémorisée : sans conséquence
-    }
+  const selected = useMemo(() => games.find((g) => g.id === selectedId) ?? games[0] ?? null, [games, selectedId]);
+  const tint = useTint(selected);
+  const browsing = filter !== "all" || q.trim() !== "";
+
+  function open(game: Game, mode: CaseMode = "front") {
+    setSelectedId(game.id);
+    setViewing({ game, mode });
   }
+  const select = (g: Game) => setSelectedId(g.id);
 
   if (!authReady)
     return (
@@ -126,87 +121,101 @@ export default function App() {
   if (!signedIn) return <Login />;
 
   return (
-    <div className="app">
+    <div className="app" style={{ ["--tint" as string]: tint, ["--tint-soft" as string]: mix(tint, "#07090f", 0.55), ["--tint-hi" as string]: mix(tint, "#ffffff", 0.45) }}>
+      <Backdrop game={loading ? null : selected} />
       <a className="skip" href="#collection">
         Aller à la collection
       </a>
-      {isDemo && <div className="demo-banner">Démo : ta collection reste dans ce navigateur.</div>}
+      {isDemo && <p className="demo-banner">Démo : ta collection reste dans ce navigateur.</p>}
 
       <header className="topbar">
         <div className="brand">
-          <Logo size={44} />
-          <div>
-            <h1 className="display">Ludothèque</h1>
-            <p className="tally mono" aria-label="Nombre de jeux par plateforme">
-              {games.length} {games.length > 1 ? "jeux" : "jeu"}
-              {PLATFORM_ORDER.map((p) => (
-                <span key={p}>
-                  {" "}
-                  · {PLATFORMS[p].label} {counts[p]}
-                </span>
-              ))}
-            </p>
-          </div>
+          <Logo size={34} />
+          <h1 className="wordmark">Ludothèque</h1>
         </div>
+        <label className="search">
+          <IconSearch />
+          <span className="sr-only">Chercher dans ma collection</span>
+          <input placeholder="Chercher un jeu" value={q} onChange={(e) => setQ(e.target.value)} type="search" />
+        </label>
         <div className="top-actions">
-          <button className="btn primary" onClick={() => setAdding(true)}>
+          <button className="btn primary add-top" onClick={() => setAdding(true)}>
             <IconPlus />
             Ranger un jeu
           </button>
           {session && (
-            <button className="btn ghost" onClick={() => supabase!.auth.signOut()} title={session.user.email ?? ""}>
-              Déconnexion
+            <button className="icon-btn" onClick={() => supabase!.auth.signOut()} aria-label="Se déconnecter" title={session.user.email ?? "Se déconnecter"}>
+              <IconLogout />
             </button>
           )}
         </div>
       </header>
 
-      <nav className="toolbar" aria-label="Filtres">
-        <div className="segmented" role="tablist" aria-label="Plateforme">
-          {(["all", ...PLATFORM_ORDER] as const).map((f) => (
-            <button key={f} role="tab" aria-selected={filter === f} className={filter === f ? "on" : ""} onClick={() => setFilter(f)}>
-              {f === "all" ? "Tous" : PLATFORMS[f].label}
-              <span className="count mono">{f === "all" ? games.length : counts[f]}</span>
-            </button>
-          ))}
-        </div>
-        <div className="toolbar-end">
-          <label className="search">
-            <IconSearch />
-            <span className="sr-only">Chercher dans ma collection</span>
-            <input placeholder="Chercher un titre" value={q} onChange={(e) => setQ(e.target.value)} type="search" />
-          </label>
-          <div className="segmented icons" role="radiogroup" aria-label="Présentation">
-            <button role="radio" aria-checked={view === "spines"} className={view === "spines" ? "on" : ""} onClick={() => changeView("spines")} title="Étagère : les tranches">
-              <IconShelf />
-              <span className="sr-only">Étagère</span>
-            </button>
-            <button role="radio" aria-checked={view === "covers"} className={view === "covers" ? "on" : ""} onClick={() => changeView("covers")} title="Vitrine : les jaquettes">
-              <IconGrid />
-              <span className="sr-only">Vitrine</span>
-            </button>
-          </div>
-        </div>
-      </nav>
-
       <main id="collection" tabIndex={-1}>
         {error ? (
-          <div className="state-error" role="alert">
+          <div className="state-msg" role="alert">
             <p>{error}</p>
             <button className="btn" onClick={() => void refresh()}>
               Réessayer
             </button>
           </div>
         ) : loading ? (
-          <ShelfSkeleton />
+          <LibrarySkeleton />
         ) : games.length === 0 ? (
-          <EmptyShelf onAdd={() => setAdding(true)} />
-        ) : shown.length === 0 ? (
-          <p className="no-match">Aucun jeu ne correspond à « {q || PLATFORMS[filter as Platform]?.label} ».</p>
+          <EmptyLibrary onAdd={() => setAdding(true)} />
         ) : (
-          <Shelf games={shown} view={view} onOpen={setViewing} />
+          <>
+            {!browsing && selected && <Hero game={selected} onOpen={open} />}
+
+            <nav className="filters" aria-label="Plateforme">
+              {(["all", ...PLATFORM_ORDER] as const).map((f) => (
+                <button key={f} aria-pressed={filter === f} className={filter === f ? "on" : ""} onClick={() => setFilter(f)}>
+                  {f === "all" ? "Tout" : PLATFORMS[f].label}
+                  <span className="mono">{f === "all" ? games.length : counts[f]}</span>
+                </button>
+              ))}
+            </nav>
+
+            {browsing ? (
+              shown.length === 0 ? (
+                <div className="state-msg">
+                  <p>{q.trim() ? `Aucun jeu ne contient « ${q.trim()} »${filter !== "all" ? ` sur ${PLATFORMS[filter].label}` : ""}.` : `Aucun jeu ${PLATFORMS[filter as Platform].label} pour l'instant.`}</p>
+                  <button
+                    className="btn"
+                    onClick={() => {
+                      setQ("");
+                      setFilter("all");
+                    }}
+                  >
+                    Tout afficher
+                  </button>
+                </div>
+              ) : (
+                <CaseGrid games={shown} onOpen={open} onSelect={select} selectedId={selected?.id ?? null} />
+              )
+            ) : (
+              <>
+                <Rail id="rail-recent" title="Derniers rangés" games={games.slice(0, 12)} onOpen={open} onSelect={select} selectedId={selected?.id ?? null} />
+                {PLATFORM_ORDER.filter((p) => counts[p] > 0).map((p) => (
+                  <Rail
+                    key={p}
+                    id={`rail-${p}`}
+                    title={PLATFORMS[p].label}
+                    games={games.filter((g) => g.platform === p)}
+                    onOpen={open}
+                    onSelect={select}
+                    selectedId={selected?.id ?? null}
+                  />
+                ))}
+              </>
+            )}
+          </>
         )}
       </main>
+
+      <button className="fab" onClick={() => setAdding(true)} aria-label="Ranger un jeu">
+        <IconPlus width={26} height={26} />
+      </button>
 
       {adding && (
         <AddGame
@@ -214,7 +223,7 @@ export default function App() {
           onAdd={async (g) => {
             const created = await addGame(g);
             setGames((list) => [created, ...list]);
-            setViewing(created);
+            open(created);
           }}
         />
       )}
@@ -229,11 +238,13 @@ export default function App() {
           }
         >
           <Viewer
-            game={viewing}
+            key={viewing.game.id}
+            game={viewing.game}
+            initialMode={viewing.mode}
             onClose={() => setViewing(null)}
             onUpdate={(g) => {
               setGames((list) => list.map((x) => (x.id === g.id ? g : x)));
-              setViewing(g);
+              setViewing((v) => (v ? { ...v, game: g } : v));
             }}
             onDelete={async (g) => {
               await deleteGame(g.id);

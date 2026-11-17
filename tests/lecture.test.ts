@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { cleanTitle } from "../src/lib/ocr";
 import { guessPlatform } from "../src/lib/platforms";
 import { normalizeGame } from "../src/lib/types";
-import { spineFit } from "../src/components/Shelf";
+import { coverSrc } from "../src/components/Library";
 
 describe("guessPlatform", () => {
   it("reconnaît le bandeau de la jaquette", () => {
@@ -38,11 +38,10 @@ describe("cleanTitle", () => {
   });
 });
 
-describe("spineFit", () => {
-  it("serre le lettrage des titres longs", () => {
-    expect(spineFit(8)).toBe(1);
-    expect(spineFit(16)).toBeLessThan(1);
-    expect(spineFit(40)).toBeLessThan(spineFit(20));
+describe("coverSrc", () => {
+  it("garde la jaquette enregistrée, sans rien générer", () => {
+    const url = "https://exemple.supabase.co/storage/v1/object/public/covers/u/gt7.jpg";
+    expect(coverSrc({ cover_url: url, title: "Gran Turismo 7", platform: "ps5" })).toBe(url);
   });
 });
 

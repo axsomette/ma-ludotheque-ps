@@ -10,3 +10,4 @@ supabase/.branches/
 security-reports/
 *.tsbuildinfo
 brand/renders/
+.claude/

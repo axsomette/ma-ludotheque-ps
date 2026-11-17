@@ -1,9 +1,9 @@
-// Logo « Disque qui sort » : le boîtier (bandeau + corps) et le disque qu'on en sort.
+// Logo « Disque qui sort » : le boîtier biseauté (bandeau + corps) et le disque qu'on en sort.
 // Sources et icônes d'appli dans brand/.
 import { useId } from "react";
 
-const CASE_BAND = "M48 36H128A12 12 0 0 1 140 48V48.4A80 80 0 0 0 105.9 60H36V48A12 12 0 0 1 48 36Z";
-const CASE_BODY = "M36 68H95.1A80 80 0 0 0 140 207.6V208A12 12 0 0 1 128 220H48A12 12 0 0 1 36 208Z";
+const CASE_BAND = "M50 36H128L140 48V48.4A80 80 0 0 0 105.9 60H36V50Z";
+const CASE_BODY = "M36 68H95.1A80 80 0 0 0 140 207.6V208L128 220H50L36 206Z";
 const DISC = "M76 128a72 72 0 1 0 144 0a72 72 0 1 0-144 0ZM130 128a18 18 0 1 0 36 0a18 18 0 1 0-36 0Z";
 
 function Iris({ id }: { id: string }) {

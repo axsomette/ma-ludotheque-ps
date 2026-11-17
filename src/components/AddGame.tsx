@@ -13,6 +13,13 @@ interface Props {
 
 type Step = "photo" | "reading" | "search" | "saving";
 
+// Les trois temps de l'ajout, affichés comme une barre de progression segmentée.
+const STAGES: Array<{ label: string; steps: Step[] }> = [
+  { label: "Photo", steps: ["photo", "reading"] },
+  { label: "Jeu", steps: ["search"] },
+  { label: "Rangement", steps: ["saving"] },
+];
+
 /**
  * Ajout d'un jeu : photo → lecture du titre (dans le navigateur) →
  * recherche du jeu sur IGDB → choix → copie de la jaquette et des captures.
@@ -132,6 +139,16 @@ export function AddGame({ onClose, onAdd }: Props) {
             <IconClose />
           </button>
         </header>
+        <ol className="stages" aria-label="Étapes">
+          {STAGES.map((st, i) => {
+            const current = STAGES.findIndex((x) => x.steps.includes(step));
+            return (
+              <li key={st.label} className={i < current ? "done" : i === current ? "now" : ""} aria-current={i === current ? "step" : undefined}>
+                {st.label}
+              </li>
+            );
+          })}
+        </ol>
 
         {step === "photo" && (
           <div className="photo-step">
@@ -202,7 +219,7 @@ export function AddGame({ onClose, onAdd }: Props) {
             {step === "saving" && (
               <div className="saving" role="status">
                 <DiscSpinner />
-                <span>Copie de la jaquette et des captures dans ta ludothèque…</span>
+                <span>Copie de la jaquette et des captures…</span>
               </div>
             )}
             {searching && (

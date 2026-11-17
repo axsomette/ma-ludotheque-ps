@@ -3,6 +3,7 @@ import { Canvas, useThree } from "@react-three/fiber";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { metaLine, mix } from "../lib/artUtils";
 import { dominantColor } from "../lib/canvasArt";
+import { coverSrc } from "./Library";
 import { uploadPhoto, type PhotoKind } from "../lib/covers";
 import { PLATFORMS } from "../lib/platforms";
 import { updateGame } from "../lib/store";
@@ -12,6 +13,8 @@ import { IconBack, IconCamera, IconCase, IconDisc, IconFlip, IconOpen, IconTrash
 
 interface Props {
   game: Game;
+  /** Geste demandé depuis l'accueil : prendre en main, ouvrir, ou sortir le disque. */
+  initialMode?: CaseMode;
   onClose: () => void;
   onDelete: (g: Game) => Promise<void>;
   onUpdate: (g: Game) => void;
@@ -41,10 +44,10 @@ const MODES: Array<{ id: CaseMode; label: string; Icon: typeof IconCase; key: st
  * Vue d'un jeu : on prend le boîtier en main (glisser), on le retourne, on l'ouvre,
  * on sort le disque et on le retourne pour voir sa face gravée.
  */
-export function Viewer({ game, onClose, onDelete, onUpdate }: Props) {
-  const [mode, setMode] = useState<CaseMode>("front");
+export function Viewer({ game, initialMode = "front", onClose, onDelete, onUpdate }: Props) {
+  const [mode, setMode] = useState<CaseMode>(initialMode);
   const [flipped, setFlipped] = useState(false);
-  const [tint, setTint] = useState("#24304f");
+  const [tint, setTint] = useState("#2a3558");
   const [busy, setBusy] = useState<PhotoKind | "delete" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [moreSummary, setMoreSummary] = useState(false);
@@ -55,11 +58,11 @@ export function Viewer({ game, onClose, onDelete, onUpdate }: Props) {
 
   useEffect(() => {
     let alive = true;
-    dominantColor(game.cover_url).then((c) => alive && setTint(c));
+    dominantColor(coverSrc(game)).then((c) => alive && setTint(c));
     return () => {
       alive = false;
     };
-  }, [game.cover_url]);
+  }, [game]);
 
   useEffect(() => {
     titleRef.current?.focus();
@@ -98,7 +101,7 @@ export function Viewer({ game, onClose, onDelete, onUpdate }: Props) {
     }
   }
 
-  const glow = mix(tint, "#0f1426", 0.35);
+  const glow = mix(tint, "#07090f", 0.4);
   const summary = game.summary ?? "";
   const longSummary = summary.length > 280;
 
@@ -131,7 +134,7 @@ export function Viewer({ game, onClose, onDelete, onUpdate }: Props) {
           <FitCamera />
         </Canvas>
 
-        <button className="icon-btn viewer-back" onClick={onClose} aria-label="Revenir à l'étagère">
+        <button className="icon-btn viewer-back" onClick={onClose} aria-label="Revenir à la ludothèque">
           <IconBack />
         </button>
 
@@ -148,18 +151,20 @@ export function Viewer({ game, onClose, onDelete, onUpdate }: Props) {
             ? flipped
               ? "Face gravée · touche le disque pour le retourner"
               : "Touche le disque pour voir sa face gravée"
-            : "Glisse pour tourner le boîtier · touche-le pour l'ouvrir"}
+            : mode === "open"
+              ? "Touche le disque pour le sortir · le boîtier pour le refermer"
+              : "Glisse pour tourner le boîtier · touche-le pour l'ouvrir"}
         </p>
       </div>
 
       <aside className="viewer-panel">
-        <span className="platform-tag" style={{ background: p.bandColor, color: p.bandText }}>
+        <span className="tag" style={{ background: p.bandColor, color: p.bandText }}>
           {p.label}
         </span>
-        <h2 id="viewer-title" ref={titleRef} tabIndex={-1}>
+        <h2 id="viewer-title" className="viewer-title" ref={titleRef} tabIndex={-1}>
           {game.title}
         </h2>
-        <p className="meta mono">{metaLine([game.release_year, game.pegi ? `PEGI ${game.pegi}` : null, game.publisher])}</p>
+        <p className="hero-meta mono">{metaLine([game.release_year, game.pegi ? `PEGI ${game.pegi}` : null, game.publisher])}</p>
         {game.genres.length > 0 && (
           <ul className="genres" aria-label="Genres">
             {game.genres.map((g) => (
