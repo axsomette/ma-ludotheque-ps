@@ -1,0 +1,23 @@
+{
+  "name": "Ma ludothèque",
+  "short_name": "Ludothèque",
+  "description": "Mes jeux PS5, PS4 et PS3 physiques, rangés sur une étagère, en boîtiers 3D qui s'ouvrent.",
+  "lang": "fr",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f1426",
+  "theme_color": "#0f1426",
+  "categories": ["entertainment", "games", "lifestyle"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Ranger un jeu", "short_name": "Ajouter", "url": "./?ajouter=1", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

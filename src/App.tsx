@@ -1,8 +1,10 @@
 import type { Session } from "@supabase/supabase-js";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { AddGame } from "./components/AddGame";
+import { IconGrid, IconPlus, IconSearch, IconShelf } from "./components/icons";
 import { Login } from "./components/Login";
-import { Shelf } from "./components/Shelf";
+import { DiscSpinner, Logo } from "./components/Logo";
+import { EmptyShelf, Shelf, ShelfSkeleton, type ShelfView } from "./components/Shelf";
 import { generatedCover } from "./lib/canvasArt";
 import { PLATFORMS, PLATFORM_ORDER } from "./lib/platforms";
 import { addGame, deleteGame, listGames } from "./lib/store";
@@ -12,12 +14,21 @@ import type { Game, NewGame, Platform } from "./lib/types";
 // Three.js n'est chargé qu'à l'ouverture d'un boîtier.
 const Viewer = lazy(() => import("./components/Viewer").then((m) => ({ default: m.Viewer })));
 
-const DEMO_SEED: Array<Pick<NewGame, "title" | "platform">> = [
-  { title: "Gridiron Legends", platform: "ps5" },
-  { title: "Neon Drift", platform: "ps5" },
-  { title: "Les Terres d'Aube", platform: "ps4" },
-  { title: "Canyon Run", platform: "ps3" },
+const DEMO_SEED: Array<Pick<NewGame, "title" | "platform" | "release_year" | "pegi" | "genres" | "publisher" | "summary">> = [
+  { title: "Gridiron Legends", platform: "ps5", release_year: 2024, pegi: 3, genres: ["Sport"], publisher: "Studio Démo", summary: "Jeu de démonstration : un match de football américain sous les projecteurs." },
+  { title: "Neon Drift", platform: "ps5", release_year: 2023, pegi: 7, genres: ["Course"], publisher: "Studio Démo", summary: "Jeu de démonstration : des courses de nuit dans une ville en néon." },
+  { title: "Les Terres d'Aube", platform: "ps4", release_year: 2019, pegi: 16, genres: ["Aventure", "RPG"], publisher: "Studio Démo", summary: "Jeu de démonstration : un voyage au long cours vers l'aube." },
+  { title: "Canyon Run", platform: "ps3", release_year: 2011, pegi: 12, genres: ["Action"], publisher: "Studio Démo", summary: "Jeu de démonstration : une course-poursuite dans les canyons." },
 ];
+
+const VIEW_KEY = "ludotheque-vue";
+function readView(): ShelfView {
+  try {
+    return localStorage.getItem(VIEW_KEY) === "covers" ? "covers" : "spines";
+  } catch {
+    return "spines";
+  }
+}
 
 let seededInMemory = false;
 function demoSeeded(): boolean {
@@ -44,7 +55,9 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Platform | "all">("all");
   const [q, setQ] = useState("");
-  const [adding, setAdding] = useState(false);
+  const [view, setView] = useState<ShelfView>(readView);
+  // Raccourci de l'icône d'appli (« Ranger un jeu ») : ?ajouter=1 ouvre directement l'ajout.
+  const [adding, setAdding] = useState(() => new URLSearchParams(window.location.search).has("ajouter"));
   const [viewing, setViewing] = useState<Game | null>(null);
 
   useEffect(() => {
@@ -68,13 +81,13 @@ export default function App() {
         // Marqueur posé AVANT l'insertion : le double appel de React (StrictMode) ne duplique pas la démo.
         markDemoSeeded();
         for (const s of DEMO_SEED.slice().reverse()) {
-          await addGame({ ...s, igdb_id: null, cover_url: generatedCover(s.title, s.platform), release_year: null });
+          await addGame({ ...s, igdb_id: null, cover_url: generatedCover(s.title, s.platform), screenshots: [], back_url: null, disc_url: null });
         }
         list = await listGames();
       }
       setGames(list);
-    } catch (e) {
-      setError((e as Error).message);
+    } catch {
+      setError("Ta collection n'a pas pu être chargée. Vérifie ta connexion.");
     } finally {
       setLoading(false);
     }
@@ -90,39 +103,55 @@ export default function App() {
     return c;
   }, [games]);
 
-  const shown = useMemo(
-    () =>
-      games.filter(
-        (g) => (filter === "all" || g.platform === filter) && (!q.trim() || g.title.toLowerCase().includes(q.trim().toLowerCase())),
-      ),
-    [games, filter, q],
-  );
+  const shown = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return games.filter((g) => (filter === "all" || g.platform === filter) && (!needle || g.title.toLowerCase().includes(needle)));
+  }, [games, filter, q]);
 
-  if (!authReady) return <div className="splash" aria-busy="true" />;
+  function changeView(v: ShelfView) {
+    setView(v);
+    try {
+      localStorage.setItem(VIEW_KEY, v);
+    } catch {
+      // préférence non mémorisée : sans conséquence
+    }
+  }
+
+  if (!authReady)
+    return (
+      <div className="splash" role="status" aria-label="Chargement">
+        <DiscSpinner size={44} />
+      </div>
+    );
   if (!signedIn) return <Login />;
 
   return (
     <div className="app">
-      {isDemo && (
-        <div className="demo-banner">
-          Mode démo : la collection reste dans ce navigateur. Branche Supabase (voir le README) pour la synchroniser.
-        </div>
-      )}
+      <a className="skip" href="#collection">
+        Aller à la collection
+      </a>
+      {isDemo && <div className="demo-banner">Démo : ta collection reste dans ce navigateur.</div>}
+
       <header className="topbar">
         <div className="brand">
-          <div className="logo small" aria-hidden>
-            <span />
-          </div>
+          <Logo size={44} />
           <div>
-            <h1>Ma ludothèque</h1>
-            <p className="muted">
-              {games.length} jeu{games.length > 1 ? "x" : ""} · {PLATFORM_ORDER.map((p) => `${counts[p]} ${PLATFORMS[p].label}`).join(" · ")}
+            <h1 className="display">Ludothèque</h1>
+            <p className="tally mono" aria-label="Nombre de jeux par plateforme">
+              {games.length} {games.length > 1 ? "jeux" : "jeu"}
+              {PLATFORM_ORDER.map((p) => (
+                <span key={p}>
+                  {" "}
+                  · {PLATFORMS[p].label} {counts[p]}
+                </span>
+              ))}
             </p>
           </div>
         </div>
         <div className="top-actions">
           <button className="btn primary" onClick={() => setAdding(true)}>
-            + Ajouter un jeu
+            <IconPlus />
+            Ranger un jeu
           </button>
           {session && (
             <button className="btn ghost" onClick={() => supabase!.auth.signOut()} title={session.user.email ?? ""}>
@@ -132,21 +161,51 @@ export default function App() {
         </div>
       </header>
 
-      <nav className="toolbar">
-        <div className="chips" role="tablist" aria-label="Filtrer par plateforme">
+      <nav className="toolbar" aria-label="Filtres">
+        <div className="segmented" role="tablist" aria-label="Plateforme">
           {(["all", ...PLATFORM_ORDER] as const).map((f) => (
-            <button key={f} role="tab" aria-selected={filter === f} className={`chip ${filter === f ? "on" : ""}`} onClick={() => setFilter(f)}>
+            <button key={f} role="tab" aria-selected={filter === f} className={filter === f ? "on" : ""} onClick={() => setFilter(f)}>
               {f === "all" ? "Tous" : PLATFORMS[f].label}
-              <span className="count">{f === "all" ? games.length : counts[f]}</span>
+              <span className="count mono">{f === "all" ? games.length : counts[f]}</span>
             </button>
           ))}
         </div>
-        <input className="search" placeholder="Rechercher dans ma collection" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Rechercher" />
+        <div className="toolbar-end">
+          <label className="search">
+            <IconSearch />
+            <span className="sr-only">Chercher dans ma collection</span>
+            <input placeholder="Chercher un titre" value={q} onChange={(e) => setQ(e.target.value)} type="search" />
+          </label>
+          <div className="segmented icons" role="radiogroup" aria-label="Présentation">
+            <button role="radio" aria-checked={view === "spines"} className={view === "spines" ? "on" : ""} onClick={() => changeView("spines")} title="Étagère : les tranches">
+              <IconShelf />
+              <span className="sr-only">Étagère</span>
+            </button>
+            <button role="radio" aria-checked={view === "covers"} className={view === "covers" ? "on" : ""} onClick={() => changeView("covers")} title="Vitrine : les jaquettes">
+              <IconGrid />
+              <span className="sr-only">Vitrine</span>
+            </button>
+          </div>
+        </div>
       </nav>
 
-      <main>
-        {error && <p className="error">{error}</p>}
-        {loading ? <div className="loading">Chargement de la collection…</div> : <Shelf games={shown} onOpen={setViewing} />}
+      <main id="collection" tabIndex={-1}>
+        {error ? (
+          <div className="state-error" role="alert">
+            <p>{error}</p>
+            <button className="btn" onClick={() => void refresh()}>
+              Réessayer
+            </button>
+          </div>
+        ) : loading ? (
+          <ShelfSkeleton />
+        ) : games.length === 0 ? (
+          <EmptyShelf onAdd={() => setAdding(true)} />
+        ) : shown.length === 0 ? (
+          <p className="no-match">Aucun jeu ne correspond à « {q || PLATFORMS[filter as Platform]?.label} ».</p>
+        ) : (
+          <Shelf games={shown} view={view} onOpen={setViewing} />
+        )}
       </main>
 
       {adding && (
@@ -161,10 +220,21 @@ export default function App() {
       )}
 
       {viewing && (
-        <Suspense fallback={<div className="viewer loading">Ouverture du boîtier…</div>}>
+        <Suspense
+          fallback={
+            <div className="viewer viewer-loading" role="status">
+              <DiscSpinner size={44} />
+              <span>Ouverture du boîtier…</span>
+            </div>
+          }
+        >
           <Viewer
             game={viewing}
             onClose={() => setViewing(null)}
+            onUpdate={(g) => {
+              setGames((list) => list.map((x) => (x.id === g.id ? g : x)));
+              setViewing(g);
+            }}
             onDelete={async (g) => {
               await deleteGame(g.id);
               setGames((list) => list.filter((x) => x.id !== g.id));

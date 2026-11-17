@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- L de Ludothèque : une tranche haute sur une planche ; deux tranches plus basses ; une tranche penchée. -->
+  <rect x="40" y="40" width="30" height="152" rx="4"/>
+  <rect x="78" y="80" width="24" height="112" rx="4"/>
+  <rect x="110" y="98" width="24" height="94" rx="4"/>
+  <rect x="148" y="84" width="24" height="108" rx="4" transform="rotate(-15 148 192)"/>
+  <rect x="32" y="200" width="192" height="16" rx="3"/>
+</svg>

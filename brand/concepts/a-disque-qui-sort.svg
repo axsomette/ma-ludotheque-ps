@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- Boîtier en deux pièces (bandeau + corps), mordu par l'espace autour du disque ; disque percé qui sort du boîtier. -->
+  <path d="M48 36H128A12 12 0 0 1 140 48V48.4A80 80 0 0 0 105.9 60H36V48A12 12 0 0 1 48 36Z"/>
+  <path d="M36 68H95.1A80 80 0 0 0 140 207.6V208A12 12 0 0 1 128 220H48A12 12 0 0 1 36 208Z"/>
+  <path fill-rule="evenodd" d="M76 128a72 72 0 1 0 144 0a72 72 0 1 0-144 0ZM132 128a16 16 0 1 0 32 0a16 16 0 1 0-32 0Z"/>
+</svg>

@@ -9,3 +9,4 @@ supabase/.temp/
 supabase/.branches/
 security-reports/
 *.tsbuildinfo
+brand/renders/

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { saveCover, savePhotoAsCover, searchCovers } from "../lib/covers";
+import { saveCover, searchCovers, uploadPhoto } from "../lib/covers";
 import { readCover } from "../lib/ocr";
 import { PLATFORMS, PLATFORM_ORDER } from "../lib/platforms";
 import type { CoverCandidate, NewGame, Platform } from "../lib/types";
+import { IconCamera, IconClose, IconSearch } from "./icons";
+import { DiscSpinner } from "./Logo";
 
 interface Props {
   onClose: () => void;
@@ -13,7 +15,7 @@ type Step = "photo" | "reading" | "search" | "saving";
 
 /**
  * Ajout d'un jeu : photo → lecture du titre (dans le navigateur) →
- * recherche de la jaquette officielle → choix → enregistrement.
+ * recherche du jeu sur IGDB → choix → copie de la jaquette et des captures.
  */
 export function AddGame({ onClose, onAdd }: Props) {
   const [step, setStep] = useState<Step>("photo");
@@ -26,8 +28,15 @@ export function AddGame({ onClose, onAdd }: Props) {
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const dialog = useRef<HTMLDivElement>(null);
 
   useEffect(() => () => void (preview && URL.revokeObjectURL(preview)), [preview]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && step !== "saving" && onClose();
+    window.addEventListener("keydown", onKey);
+    dialog.current?.querySelector<HTMLElement>("button, input")?.focus();
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose, step]);
 
   async function onPhoto(file: File) {
     setError(null);
@@ -37,17 +46,19 @@ export function AddGame({ onClose, onAdd }: Props) {
     setProgress(0);
     try {
       const r = await readCover(file, setProgress);
+      const pf = r.platform ?? platform;
       if (r.platform) setPlatform(r.platform);
       setQuery(r.title);
       setStep("search");
-      if (r.title) void runSearch(r.title, r.platform ?? platform);
-    } catch (e) {
-      setError(`Lecture de la photo impossible (${(e as Error).message}). Tape le titre à la main.`);
+      if (r.title) void runSearch(r.title, pf);
+    } catch {
+      setError("Le titre n'a pas pu être lu sur la photo. Tape-le ci-dessous.");
       setStep("search");
     }
   }
 
   async function runSearch(q = query, pf = platform) {
+    if (!q.trim()) return;
     setSearching(true);
     setError(null);
     try {
@@ -64,8 +75,21 @@ export function AddGame({ onClose, onAdd }: Props) {
     setStep("saving");
     setError(null);
     try {
-      const cover_url = await saveCover(c, platform);
-      await onAdd({ title: c.name, platform, igdb_id: c.igdb_id, cover_url, release_year: c.year });
+      const { url, screenshots } = await saveCover(c, platform);
+      await onAdd({
+        title: c.name,
+        platform,
+        igdb_id: c.igdb_id,
+        cover_url: url,
+        release_year: c.year,
+        summary: c.summary,
+        publisher: c.publisher,
+        genres: c.genres,
+        pegi: c.pegi,
+        screenshots,
+        back_url: null,
+        disc_url: null,
+      });
       onClose();
     } catch (e) {
       setError((e as Error).message);
@@ -77,8 +101,21 @@ export function AddGame({ onClose, onAdd }: Props) {
     if (!photo) return;
     setStep("saving");
     try {
-      const cover_url = await savePhotoAsCover(photo);
-      await onAdd({ title: query.trim() || "Jeu sans titre", platform, igdb_id: null, cover_url, release_year: null });
+      const cover_url = await uploadPhoto(photo, "front");
+      await onAdd({
+        title: query.trim() || "Jeu sans titre",
+        platform,
+        igdb_id: null,
+        cover_url,
+        release_year: null,
+        summary: null,
+        publisher: null,
+        genres: [],
+        pegi: null,
+        screenshots: [],
+        back_url: null,
+        disc_url: null,
+      });
       onClose();
     } catch (e) {
       setError((e as Error).message);
@@ -87,43 +124,34 @@ export function AddGame({ onClose, onAdd }: Props) {
   }
 
   return (
-    <div className="sheet-backdrop" onClick={onClose}>
-      <div className="sheet" role="dialog" aria-modal="true" aria-label="Ajouter un jeu" onClick={(e) => e.stopPropagation()}>
+    <div className="sheet-backdrop" onClick={() => step !== "saving" && onClose()}>
+      <div ref={dialog} className="sheet" role="dialog" aria-modal="true" aria-labelledby="add-title" onClick={(e) => e.stopPropagation()}>
         <header className="sheet-head">
-          <h2>Ajouter un jeu</h2>
-          <button className="btn ghost" onClick={onClose} aria-label="Fermer">
-            ✕
+          <h2 id="add-title">Ranger un jeu</h2>
+          <button className="icon-btn" onClick={onClose} aria-label="Fermer" disabled={step === "saving"}>
+            <IconClose />
           </button>
         </header>
 
         {step === "photo" && (
           <div className="photo-step">
             <button className="photo-drop" onClick={() => fileInput.current?.click()}>
-              <span className="photo-icon" aria-hidden>
-                📷
-              </span>
-              <strong>Prendre la jaquette en photo</strong>
-              <span className="muted">Face avant, bien droite, avec le bandeau PS5 / PS4 / PS3 visible</span>
+              <IconCamera width={34} height={34} />
+              <strong>Photographier la jaquette</strong>
+              <span className="muted">De face, avec le bandeau PS5, PS4 ou PS3 visible en haut.</span>
             </button>
-            <input
-              ref={fileInput}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              hidden
-              onChange={(e) => e.target.files?.[0] && onPhoto(e.target.files[0])}
-            />
-            <button className="btn link" onClick={() => setStep("search")}>
-              … ou taper le titre
+            <input ref={fileInput} type="file" accept="image/*" capture="environment" hidden onChange={(e) => e.target.files?.[0] && onPhoto(e.target.files[0])} />
+            <button className="text-btn" onClick={() => setStep("search")}>
+              Taper le titre à la place
             </button>
           </div>
         )}
 
         {step === "reading" && (
-          <div className="reading">
+          <div className="reading" role="status">
             {preview && <img src={preview} alt="Photo de la jaquette" className="photo-preview" />}
-            <p>Lecture du titre… {Math.round(progress * 100)} %</p>
-            <div className="bar">
+            <p>Lecture du titre sur la photo… {Math.round(progress * 100)} %</p>
+            <div className="bar" aria-hidden>
               <span style={{ width: `${Math.round(progress * 100)}%` }} />
             </div>
           </div>
@@ -139,18 +167,22 @@ export function AddGame({ onClose, onAdd }: Props) {
               }}
             >
               {preview && <img src={preview} alt="" className="photo-thumb" />}
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Titre du jeu" aria-label="Titre du jeu" autoFocus />
-              <button className="btn primary" disabled={!query.trim() || searching}>
-                {searching ? "…" : "Chercher"}
+              <label className="field">
+                <span className="field-label">Titre du jeu</span>
+                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Gran Turismo 7" autoFocus enterKeyHint="search" />
+              </label>
+              <button className="btn primary" disabled={!query.trim() || searching || step === "saving"} aria-label="Chercher">
+                <IconSearch />
+                <span className="hide-sm">Chercher</span>
               </button>
             </form>
-            <div className="chips" role="radiogroup" aria-label="Plateforme">
+            <div className="segmented" role="radiogroup" aria-label="Plateforme">
               {PLATFORM_ORDER.map((pf) => (
                 <button
                   key={pf}
                   role="radio"
                   aria-checked={platform === pf}
-                  className={`chip ${platform === pf ? "on" : ""}`}
+                  className={platform === pf ? "on" : ""}
                   onClick={() => {
                     setPlatform(pf);
                     if (query.trim()) void runSearch(query, pf);
@@ -161,25 +193,47 @@ export function AddGame({ onClose, onAdd }: Props) {
               ))}
             </div>
 
-            {error && <p className="error">{error}</p>}
-            {step === "saving" && <p className="muted">Enregistrement de la jaquette…</p>}
-
-            {results && results.length === 0 && !searching && <p className="muted">Aucun jeu trouvé. Corrige le titre, ou garde ta photo comme jaquette.</p>}
-            {results && results.length > 0 && (
-              <ul className="results">
-                {results.map((c) => (
-                  <li key={`${c.igdb_id}-${c.name}`}>
-                    <button onClick={() => choose(c)} disabled={step === "saving"}>
-                      <img src={c.thumb_url} alt="" loading="lazy" />
-                      <span>{c.name}</span>
-                      {c.year && <small>{c.year}</small>}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+            {error && (
+              <p className="error" role="alert">
+                {error}
+              </p>
             )}
-            {photo && (
-              <button className="btn ghost" onClick={usePhoto} disabled={step === "saving"}>
+
+            {step === "saving" && (
+              <div className="saving" role="status">
+                <DiscSpinner />
+                <span>Copie de la jaquette et des captures dans ta ludothèque…</span>
+              </div>
+            )}
+            {searching && (
+              <div className="saving" role="status">
+                <DiscSpinner />
+                <span>Recherche du jeu…</span>
+              </div>
+            )}
+
+            {results && results.length === 0 && !searching && step !== "saving" && (
+              <p className="muted">Aucun jeu trouvé pour « {query} ». Vérifie l'orthographe, essaie une autre plateforme, ou garde ta photo comme jaquette.</p>
+            )}
+            {results && results.length > 0 && step !== "saving" && !searching && (
+              <>
+                <p className="muted small">Choisis la bonne édition :</p>
+                <ul className="results">
+                  {results.map((c) => (
+                    <li key={`${c.igdb_id}-${c.name}`}>
+                      <button onClick={() => choose(c)}>
+                        <img src={c.thumb_url} alt="" loading="lazy" />
+                        <span className="r-name">{c.name}</span>
+                        <span className="r-meta mono">{[c.year, c.pegi ? `PEGI ${c.pegi}` : null].filter(Boolean).join(" · ")}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {photo && step !== "saving" && (
+              <button className="btn ghost" onClick={usePhoto}>
+                <IconCamera />
                 Garder ma photo comme jaquette
               </button>
             )}

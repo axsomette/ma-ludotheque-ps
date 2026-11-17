@@ -5,10 +5,34 @@ Ma collection de jeux PlayStation **physiques** (PS3, PS4, PS5), en boîtiers 3D
 1. Je prends la jaquette en photo depuis mon téléphone.
 2. Le titre est lu directement dans le navigateur, et la plateforme est devinée grâce au bandeau PS5, PS4 ou PS3.
 3. La jaquette officielle est retrouvée sur [IGDB](https://www.igdb.com/).
-4. Le jeu rejoint l'étagère. Un clic ouvre le boîtier en 3D : le couvercle pivote, le disque sort et tourne.
+4. Le jeu se range sur l'**étagère**, par la tranche (ou de face, en vue **Vitrine**).
 5. Tout est enregistré dans Supabase, par utilisateur (connexion GitHub ou lien par e-mail).
 
 Sans configuration, l'appli démarre en **mode démo** : la collection reste dans le navigateur, et les jaquettes sont générées.
+
+## Le boîtier, de A à Z
+
+Toucher une tranche ouvre le boîtier en 3D, aux proportions d'un vrai boîtier Blu-ray (135 × 171 × 15 mm) :
+
+- **Prendre en main** : glisser pour le tourner ; il reprend sa pose au relâchement.
+- **Face / Dos** : jaquette avant ; dos composé avec les vraies données IGDB (captures, résumé, genres, PEGI, éditeur).
+- **Ouvrir** : le couvercle pivote sur la tranche ; moyeu à griffes, clips à livret.
+- **Disque** : il sort du boîtier et tourne ; le toucher le retourne pour voir la face gravée irisée.
+- **Photos du vrai boîtier** : photographier le dos et le disque pour remplacer les versions générées.
+
+Raccourcis clavier dans la vue : `F` face, `D` dos, `O` ouvrir, `X` disque, `Espace` ouvrir/fermer, `Échap` retour.
+
+## Sur le téléphone (PWA)
+
+L'appli s'installe comme une application : Safari → Partager → **Sur l'écran d'accueil** (iPhone), ou Chrome → **Installer l'application** (Android). L'interface reste disponible hors ligne ; les données Supabase ne sont jamais mises en cache. Le logo et ses déclinaisons sont dans `brand/` (les trois pistes étudiées dans `brand/concepts/`).
+
+## Tests
+
+```bash
+npm test
+```
+
+Vitest : calculs de couleurs et PEGI, découpe des textes du dos, détection de plateforme et nettoyage du titre lu sur la photo, collection en mode démo. Le workflow de déploiement exécute les tests avant chaque mise en ligne.
 
 ## Architecture
 

@@ -8,8 +8,31 @@ export interface OcrResult {
   raw: string;
 }
 
-// Mots imprimés sur toutes les jaquettes, sans rapport avec le titre.
-const NOISE = /^(PS[345]|PLAYSTATION|PLAY|STATION|PEGI|ONLY|ON|SONY|ENTERTAINMENT|BLU|RAY|DISC|NETWORK|ONLINE|VR|\d{1,2}\+?|WWW|COM)$/i;
+// Lignes entières sans rapport avec le titre : mentions légales, site web, PEGI, Blu-ray…
+const NOISE_LINE = /(©|\bwww\b|\.com|\bpegi\b|blu-?ray|only on|exclusivit|playstation network)/i;
+// Mots du bandeau imprimés sur toutes les jaquettes.
+const NOISE_WORD = /^(PS[345]|PLAYSTATION|ONLY|SONY|ENTERTAINMENT|NETWORK|VR)$/i;
+
+/**
+ * Extrait un titre probable du texte brut lu sur la jaquette.
+ * Les chiffres des titres sont conservés (Gran Turismo 7, FIFA 23) ; un nombre seul sur sa ligne
+ * (l'âge PEGI, souvent) est écarté. On garde les deux premières lignes utiles.
+ */
+export function cleanTitle(raw: string): string {
+  const lines = raw
+    .split("\n")
+    .filter((l) => !NOISE_LINE.test(l))
+    .map((l) => l.replace(/[^\p{L}\p{N}' :&-]/gu, " ").replace(/\s+/g, " ").trim())
+    .map((l) =>
+      l
+        .split(" ")
+        // un caractère isolé est en général du bruit d'OCR, sauf un chiffre (GT7) ou « A » / « I »
+        .filter((w) => (w.length > 1 || /[\dAI]/.test(w)) && !NOISE_WORD.test(w))
+        .join(" "),
+    )
+    .filter((l) => l.length >= 3 && !/^\d+\+?$/.test(l));
+  return lines.slice(0, 2).join(" ").slice(0, 60);
+}
 
 /**
  * Lit le texte de la photo de la jaquette, directement dans le navigateur
@@ -25,15 +48,7 @@ export async function readCover(file: Blob, onProgress?: (p: number) => void): P
   try {
     const { data } = await worker.recognize(file);
     const raw = data.text ?? "";
-    // On garde les lignes les plus « grosses » et lisibles : le titre est en général en grand.
-    const lines = raw
-      .split("\n")
-      .map((l) => l.replace(/[^\p{L}\p{N}' :&-]/gu, " ").replace(/\s+/g, " ").trim())
-      .filter((l) => l.length >= 2)
-      .map((l) => l.split(" ").filter((w) => w.length > 1 && !NOISE.test(w)).join(" "))
-      .filter((l) => l.length >= 3);
-    const title = lines.slice(0, 2).join(" ").slice(0, 60);
-    return { title, platform: guessPlatform(raw), raw };
+    return { title: cleanTitle(raw), platform: guessPlatform(raw), raw };
   } finally {
     await worker.terminate();
   }
