@@ -1,0 +1,8 @@
+# Configuration Supabase CLI (utile pour `supabase link`, `db push` et `functions deploy`).
+project_id = "ma-ludotheque-ps"
+
+[functions.search-cover]
+verify_jwt = true
+
+[functions.save-cover]
+verify_jwt = true
