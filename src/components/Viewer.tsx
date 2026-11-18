@@ -126,10 +126,12 @@ export function Viewer({ game, initialMode = "front", onClose, onDelete, onUpdat
   return (
     <div className="viewer" role="dialog" aria-modal="true" aria-labelledby="viewer-title" style={{ ["--glow" as string]: glow }}>
       <div className="viewer-stage">
-        <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 0.25, 5.6], fov: 32 }} gl={{ antialias: true, alpha: true }}>
-          <ambientLight intensity={0.55} />
-          <directionalLight position={[3, 4, 6]} intensity={2.1} castShadow shadow-mapSize={[1024, 1024]} />
-          <directionalLight position={[-4, 2, -3]} intensity={1.1} color={mix(tint, "#ffffff", 0.4)} />
+        <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 0.25, 5.6], fov: 32 }} gl={{ antialias: true, alpha: true, preserveDrawingBuffer: import.meta.env.DEV }}>
+          {/* Éclairage studio produit : lumière principale douce de face, contre-jour teinté, débouchage. */}
+          <ambientLight intensity={0.9} />
+          <directionalLight position={[2.5, 3.5, 6]} intensity={3.1} castShadow shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004} />
+          <directionalLight position={[-5, 1.5, 3]} intensity={1.2} color="#dfe6ff" />
+          <directionalLight position={[-3, 2, -4]} intensity={1.4} color={mix(tint, "#ffffff", 0.35)} />
           <Suspense fallback={null}>
             <PresentationControls global snap speed={1.6} polar={[-0.45, 0.45]} azimuth={[-1.2, 1.2]} cursor>
               <GameCase3D
@@ -143,7 +145,8 @@ export function Viewer({ game, initialMode = "front", onClose, onDelete, onUpdat
             </PresentationControls>
             {/* éclairage studio généré localement : aucun fichier HDR à télécharger */}
             <Environment resolution={256}>
-              <Lightformer form="rect" intensity={3.2} position={[0, 4, 4]} scale={[9, 2, 1]} />
+              <Lightformer form="rect" intensity={4.2} position={[0, 4, 4]} scale={[9, 2, 1]} />
+              <Lightformer form="rect" intensity={2.4} position={[0, -1, 6]} scale={[8, 1.2, 1]} />
               <Lightformer form="rect" intensity={1.6} color={mix(tint, "#ffffff", 0.5)} position={[-5, 1, 1]} scale={[3, 6, 1]} />
               <Lightformer form="ring" intensity={2.2} position={[4, 1, 3]} scale={2} />
             </Environment>

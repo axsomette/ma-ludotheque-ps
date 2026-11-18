@@ -2,7 +2,7 @@ import { RoundedBox, useTexture } from "@react-three/drei";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { backCover, discDataSide, discLabel, generatedCover, spineTexture } from "../lib/canvasArt";
+import { backCover, discDataSide, discLabel, frontCover, generatedCover, spineTexture } from "../lib/canvasArt";
 import { PLATFORMS } from "../lib/platforms";
 import type { Game } from "../lib/types";
 
@@ -47,10 +47,12 @@ export function GameCase3D({ game, mode, discFlipped, tint, onCaseClick, onDiscC
   const spine = useMemo(() => canvasTexture(spineTexture(game, tint)), [game, tint]);
   const dataSide = useMemo(() => canvasTexture(discDataSide()), []);
 
+  const [front, setFront] = useState<THREE.Texture | null>(null);
   const [back, setBack] = useState<THREE.Texture | null>(null);
   const [label, setLabel] = useState<THREE.Texture | null>(null);
   useEffect(() => {
     let alive = true;
+    frontCover(game).then((c) => alive && setFront(canvasTexture(c)));
     backCover(game, tint).then((c) => alive && setBack(canvasTexture(c)));
     discLabel(game).then((c) => alive && setLabel(canvasTexture(c)));
     return () => {
@@ -90,10 +92,27 @@ export function GameCase3D({ game, mode, discFlipped, tint, onCaseClick, onDiscC
     d.rotation.set(out ? 0.12 : 0, flip.current, spin.current);
   });
 
+  // Plastique moulé : brillant, légèrement translucide sur PS5 (la jaquette se devine à travers les bords).
   const plastic = (
-    <meshPhysicalMaterial color={p.caseColor} roughness={0.32} metalness={0.02} clearcoat={0.9} clearcoatRoughness={0.18} />
+    <meshPhysicalMaterial
+      color={p.caseColor}
+      roughness={0.22}
+      metalness={0}
+      clearcoat={1}
+      clearcoatRoughness={0.12}
+      transmission={p.translucency}
+      thickness={0.03}
+      ior={1.49}
+      transparent={p.translucency > 0}
+      opacity={p.translucency > 0 ? 0.92 : 1}
+    />
   );
-  const inner = <meshPhysicalMaterial color={p.caseColor} roughness={0.6} sheen={0.4} sheenColor="#ffffff" />;
+  const inner = <meshPhysicalMaterial color={p.caseInner} roughness={0.55} clearcoat={0.4} sheen={0.3} sheenColor="#ffffff" />;
+  // Film transparent qui recouvre les jaquettes : un reflet net par-dessus l'impression mate.
+  const sleeve = (map: THREE.Texture | null) => (
+    // clé = texture : le matériau se recompile quand l'image arrive après le premier rendu
+    <meshPhysicalMaterial key={map ? map.uuid : "vide"} map={map ?? undefined} color={map ? "#ffffff" : "#3a3f4b"} roughness={0.38} clearcoat={1} clearcoatRoughness={0.04} specularIntensity={0.6} />
+  );
 
   const hover = {
     onPointerOver: () => (document.body.style.cursor = "pointer"),
@@ -117,7 +136,7 @@ export function GameCase3D({ game, mode, discFlipped, tint, onCaseClick, onDiscC
         {/* jaquette arrière, sous le film transparent */}
         <mesh position={[0, 0, -D / 2 - 0.0012]} rotation={[0, Math.PI, 0]}>
           <planeGeometry args={[W - 0.05, H - 0.05]} />
-          <meshPhysicalMaterial map={back ?? cover} color={back ? "#ffffff" : "#3a3f4b"} roughness={0.3} clearcoat={1} clearcoatRoughness={0.1} />
+          {sleeve(back)}
         </mesh>
         {/* tranche (côté charnière) avec son impression */}
         <mesh position={[-W / 2 + T / 2, 0, 0]} castShadow>
@@ -126,7 +145,7 @@ export function GameCase3D({ game, mode, discFlipped, tint, onCaseClick, onDiscC
         </mesh>
         <mesh position={[-W / 2 - 0.0012, 0, 0]} rotation={[0, -Math.PI / 2, 0]}>
           <planeGeometry args={[D - 0.02, H - 0.05]} />
-          <meshPhysicalMaterial map={spine} roughness={0.3} clearcoat={1} clearcoatRoughness={0.1} />
+          {sleeve(spine)}
         </mesh>
         {/* bords haut / bas / ouverture */}
         {[H / 2 - T / 2, -H / 2 + T / 2].map((y) => (
@@ -146,19 +165,19 @@ export function GameCase3D({ game, mode, discFlipped, tint, onCaseClick, onDiscC
         </mesh>
         <mesh position={[0, 0.04, -D / 2 + T + 0.004]} rotation={[Math.PI / 2, 0, 0]}>
           <cylinderGeometry args={[DISC_R + 0.02, DISC_R + 0.02, 0.006, 96]} />
-          <meshStandardMaterial color={p.caseColor} roughness={0.75} />
+          <meshStandardMaterial color={p.caseInner} roughness={0.7} />
         </mesh>
         <group position={[0, 0.04, -D / 2 + T + 0.022]}>
           <mesh rotation={[Math.PI / 2, 0, 0]}>
             <cylinderGeometry args={[HOLE_R - 0.004, HOLE_R + 0.004, 0.03, 32]} />
-            <meshStandardMaterial color="#e4e7ee" roughness={0.35} />
+            <meshPhysicalMaterial color={p.caseInner} roughness={0.3} clearcoat={0.8} />
           </mesh>
           {Array.from({ length: 8 }, (_, i) => {
             const a = (i / 8) * Math.PI * 2;
             return (
               <mesh key={i} position={[Math.cos(a) * 0.055, Math.sin(a) * 0.055, 0.012]} rotation={[0, 0, a]}>
                 <boxGeometry args={[0.03, 0.012, 0.016]} />
-                <meshStandardMaterial color="#f2f4f8" roughness={0.3} />
+                <meshPhysicalMaterial color={p.caseInner} roughness={0.3} clearcoat={0.8} />
               </mesh>
             );
           })}
@@ -229,7 +248,7 @@ export function GameCase3D({ game, mode, discFlipped, tint, onCaseClick, onDiscC
         {/* jaquette avant sous le film transparent */}
         <mesh position={[W / 2 + 0.006, 0, T / 2 + 0.0012]}>
           <planeGeometry args={[W - 0.05, H - 0.05]} />
-          <meshPhysicalMaterial map={cover} roughness={0.26} clearcoat={1} clearcoatRoughness={0.08} />
+          <meshPhysicalMaterial key={front ? front.uuid : "cover"} map={front ?? cover} roughness={0.38} clearcoat={1} clearcoatRoughness={0.04} specularIntensity={0.6} />
         </mesh>
         {/* face intérieure et clips à livret */}
         <mesh position={[W / 2, 0, -T / 2 - 0.001]} rotation={[0, Math.PI, 0]}>
@@ -239,7 +258,7 @@ export function GameCase3D({ game, mode, discFlipped, tint, onCaseClick, onDiscC
         {[0.62, -0.62].map((y) => (
           <mesh key={y} position={[W / 2 + 0.42, y, -T / 2 - 0.01]}>
             <boxGeometry args={[0.2, 0.05, 0.02]} />
-            <meshStandardMaterial color={p.caseColor} roughness={0.45} />
+            <meshPhysicalMaterial color={p.caseInner} roughness={0.35} clearcoat={0.6} />
           </mesh>
         ))}
       </group>

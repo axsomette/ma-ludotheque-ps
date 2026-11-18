@@ -4,6 +4,10 @@ interface PlatformStyle {
   label: string;
   /** Couleur du plastique du boîtier. */
   caseColor: string;
+  /** Plastique vu de l'intérieur (plateau, moyeu), plus clair. */
+  caseInner: string;
+  /** Translucidité du plastique (0 = opaque) : le boîtier PS5 laisse voir la jaquette en transparence. */
+  translucency: number;
   /** Bandeau du haut de la jaquette et de la tranche. */
   bandColor: string;
   bandText: string;
@@ -11,11 +15,11 @@ interface PlatformStyle {
   accent: string;
 }
 
-// Couleurs inspirées des boîtiers réels, sans logo ni marque déposée.
+// Boîtiers européens (PAL), relevés sur de vrais boîtiers ; aucun logo ni marque déposée n'est reproduit.
 export const PLATFORMS: Record<Platform, PlatformStyle> = {
-  ps3: { label: "PS3", caseColor: "#16171b", bandColor: "#0c0c0e", bandText: "#e9e9ee", accent: "#a6adbb" },
-  ps4: { label: "PS4", caseColor: "#0d3fa6", bandColor: "#003791", bandText: "#ffffff", accent: "#3d7bff" },
-  ps5: { label: "PS5", caseColor: "#0a3a9c", bandColor: "#f4f5f7", bandText: "#111318", accent: "#e8ecf5" },
+  ps3: { label: "PS3", caseColor: "#121316", caseInner: "#131418", translucency: 0, bandColor: "#0b0b0d", bandText: "#e4e6ec", accent: "#a6adbb" },
+  ps4: { label: "PS4", caseColor: "#0d3fa6", caseInner: "#24509f", translucency: 0, bandColor: "#0b4fc2", bandText: "#ffffff", accent: "#3d7bff" },
+  ps5: { label: "PS5", caseColor: "#2a63d6", caseInner: "#2f5fc4", translucency: 0.35, bandColor: "#ffffff", bandText: "#000000", accent: "#e8ecf5" },
 };
 
 export const PLATFORM_ORDER: Platform[] = ["ps5", "ps4", "ps3"];
