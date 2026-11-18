@@ -23,7 +23,7 @@ On photographie un jeu, la jaquette est retrouvée, et le boîtier s'ouvre sur s
 
 ## Ce que ça fait
 
-| | |
+| Fonction | En pratique |
 |---|---|
 | **Photographier, c'est ranger** | Le titre est lu sur la photo **dans le navigateur** (Tesseract), la console est devinée grâce au bandeau, et la jaquette officielle est retrouvée sur IGDB. |
 | **Des boîtiers fidèles** | Coque Blu-ray modélisée dans Blender (deux demi-coques, double charnière, moyeu à pétales, attaches à livret), plastique PS5 translucide, PS4 bleu, PS3 noir. Bandeaux et pictogrammes PEGI officiels, mise en page européenne. |
