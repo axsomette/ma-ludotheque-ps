@@ -2,7 +2,7 @@
 // Mise en page des boîtiers européens (PAL) PS5, PS4 et PS3, relevée sur de vrais boîtiers.
 // Bandeaux : logotypes officiels PS5 / PS4 / PS3 (versions du domaine public de Wikimedia Commons,
 // public/brand/consoles/), seuls le visuel et les infos du jeu changent d'une jaquette à l'autre.
-import { mix, pegiColor, wrapText } from "./artUtils";
+import { bandRows, isBandPixel, mix, pegiColor, wrapText } from "./artUtils";
 import { PLATFORMS } from "./platforms";
 import type { Game, Platform } from "./types";
 
@@ -270,33 +270,29 @@ export function generatedCover(title: string, platform: Platform): string {
 }
 
 /**
- * La jaquette a-t-elle déjà son bandeau de plateforme ? On regarde la bande du haut :
- * uniforme et claire (PS5), bleue (PS4) ou très sombre (PS3).
+ * Part de la hauteur occupée par le bandeau d'origine de la jaquette (0 s'il n'y en a pas).
+ * Mesuré ligne par ligne sur toute la largeur : le logo du bandeau ne fausse pas la mesure.
  */
-function hasBand(img: Img, platform: Platform): boolean {
-  const sample = (y0: number, y1: number) => {
-    const c = document.createElement("canvas");
-    c.width = 24; c.height = 4;
-    const ctx = c.getContext("2d", { willReadFrequently: true })!;
-    // milieu de la largeur seulement : le nom de plateforme est à gauche, « PlayStation Network » à droite (PS3)
-    ctx.drawImage(img, img.width * 0.35, img.height * y0, img.width * 0.3, img.height * (y1 - y0), 0, 0, 24, 4);
-    const d = ctx.getImageData(0, 0, 24, 4).data;
-    let r = 0, g = 0, b = 0;
-    const n = d.length / 4;
-    for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
-    r /= n; g /= n; b /= n;
-    let v = 0;
-    for (let i = 0; i < d.length; i += 4) v += Math.abs(d[i] - r) + Math.abs(d[i + 1] - g) + Math.abs(d[i + 2] - b);
-    return { r, g, b, v: v / n };
-  };
-  const band = sample(0.015, 0.07);
-  const below = sample(0.13, 0.17);
-  // un vrai bandeau est uni et tranche nettement avec l'illustration juste en dessous
-  const contrast = Math.abs(band.r - below.r) + Math.abs(band.g - below.g) + Math.abs(band.b - below.b);
-  if (band.v > 45 || contrast < 70) return false;
-  if (platform === "ps5") return band.r > 225 && band.g > 225 && band.b > 225;
-  if (platform === "ps4") return band.b > 120 && band.r < 70 && band.g < 120;
-  return band.r < 45 && band.g < 45 && band.b < 50;
+function bandFraction(img: Img, platform: Platform): number {
+  const w = 120;
+  const h = Math.max(80, Math.round((w * img.height) / img.width));
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  const ctx = c.getContext("2d", { willReadFrequently: true })!;
+  ctx.drawImage(img, 0, 0, w, h);
+  const rows = Math.round(h * 0.2);
+  const d = ctx.getImageData(0, 0, w, rows).data;
+  const x0 = Math.round(w * 0.03), x1 = w - x0; // on ignore les bords (scans légèrement rognés)
+  const share: number[] = [];
+  for (let y = 0; y < rows; y++) {
+    let n = 0;
+    for (let x = x0; x < x1; x++) {
+      const i = (y * w + x) * 4;
+      if (isBandPixel(d[i], d[i + 1], d[i + 2], platform)) n++;
+    }
+    share.push(n / (x1 - x0));
+  }
+  return bandRows(share, h) / h;
 }
 
 /**
@@ -317,8 +313,10 @@ export async function frontCover(game: Game): Promise<HTMLCanvasElement> {
     img = null;
   }
   const bh = Math.round(H * BAND);
-  if (img && hasBand(img, game.platform)) {
-    const cut = Math.round(img.height * BAND);
+  const band = img ? bandFraction(img, game.platform) : 0;
+  if (img && band > 0) {
+    // jaquette avec son propre bandeau : on le remplace par le bandeau officiel, rien d'autre ne change
+    const cut = Math.ceil(img.height * band) + 1;
     const art = document.createElement("canvas");
     art.width = img.width;
     art.height = img.height - cut;

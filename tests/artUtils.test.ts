@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hexToRgb, luminance, metaLine, mix, pegiColor, readableOn, rgbToHex, wrapText } from "../src/lib/artUtils";
+import { hexToRgb, luminance, metaLine, mix, pegiColor, readableOn, rgbToHex, wrapText, bandRows } from "../src/lib/artUtils";
 
 describe("pegiColor", () => {
   it("suit les couleurs officielles PEGI", () => {
@@ -67,5 +67,20 @@ describe("metaLine", () => {
   it("ignore les informations absentes", () => {
     expect(metaLine([2022, "PEGI 3", null, undefined, "", "Sony"])).toBe("2022 · PEGI 3 · Sony");
     expect(metaLine([null, null])).toBe("");
+  });
+});
+
+describe("bandRows : hauteur du bandeau d'origine d'une jaquette", () => {
+  // parts de pixels à la couleur du bandeau, ligne par ligne (relevées sur de vraies jaquettes)
+  const astro = [1, 0.98, 0.96, 0.96, 0.71, 0.88, 0.88, 0.75, 0.84, 0.8, 0.69, 0.88, 0.95, 1, 1, 0, 0, 0, 0, 0];
+  const tlou = [0.76, 0.76, 0.54, 0.47, 0.6, 0.46, 0.42, 0.58, 0.55, 0.76, 0.76, 0, 0, 0.04, 0.01, 0.03];
+  const gow = [1, 1, 0.98, 0.96, 0.95, 0.91, 0.88, 0.83, 0.82, 0.8, 0.77, 0.82, 0.96, 1, 1, 1, 0.77, 0.99, 1, 0.98, 0.95, 0.88, 0.79, 0.74, 0.7, 0.63, 0.59, 0.34, 0.29, 0.22];
+
+  it("mesure un bandeau PS5 jusqu'à la cassure", () => expect(bandRows(astro, 150)).toBe(15));
+  it("tolère le logo argenté et les mentions d'un bandeau PS3", () => expect(bandRows(tlou, 138)).toBe(11));
+  it("retient la hauteur standard quand l'illustration prolonge la couleur du bandeau", () => expect(bandRows(gow, 150)).toBe(16));
+  it("ne voit pas de bandeau sur une illustration seule", () => {
+    expect(bandRows([0, 0, 0.1, 0.2, 0.1], 150)).toBe(0);
+    expect(bandRows([0.4, 0.35, 0.3, 0.32, 0.4, 0.3, 0.31, 0.36, 0.4, 0.3, 0, 0], 150)).toBe(0);
   });
 });

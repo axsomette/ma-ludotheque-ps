@@ -1,5 +1,5 @@
 // Fonctions de calcul pur (sans DOM) utilisées pour composer les visuels. Testées dans tests/.
-import type { Pegi } from "./types";
+import type { Pegi, Platform } from "./types";
 
 /** Couleurs officielles des pictogrammes d'âge PEGI : vert (3, 7), orange (12, 16), rouge (18). */
 export function pegiColor(pegi: Pegi): string {
@@ -68,4 +68,32 @@ export function wrapText(text: string, maxWidth: number, measure: (s: string) =>
 /** Ligne d'informations type « dos de boîtier » : PS5 · 2022 · PEGI 3 · Éditeur. */
 export function metaLine(parts: Array<string | number | null | undefined>): string {
   return parts.filter((p) => p !== null && p !== undefined && String(p).trim() !== "").join(" · ");
+}
+
+/** Le pixel a-t-il la couleur du bandeau de la plateforme (blanc PS5, bleu PS4, noir PS3) ? */
+export function isBandPixel(r: number, g: number, b: number, platform: Platform): boolean {
+  if (platform === "ps5") return r > 200 && g > 200 && b > 200 && Math.max(r, g, b) - Math.min(r, g, b) < 30;
+  if (platform === "ps4") return b > 140 && b - r > 70 && b - g > 30;
+  return Math.max(r, g, b) < 62;
+}
+
+/**
+ * Hauteur du bandeau d'origine d'une jaquette, en nombre de lignes depuis le haut, ou 0 s'il n'y en a pas.
+ * `share[y]` = part des pixels de la ligne y qui ont la couleur du bandeau (lignes du haut de l'image).
+ * Le bandeau s'arrête à la première cassure nette (moins de 20 % de pixels à sa couleur) ; au-dessus,
+ * sa couleur doit dominer (moyenne ≥ 55 %, jamais moins de 30 % : le logo et les mentions en prennent une part).
+ * Un vrai bandeau européen fait 5 à 14 % de la hauteur. Sans cassure (illustration de la même couleur
+ * juste en dessous), on retient la hauteur standard si le haut de l'image a bien l'allure d'un bandeau.
+ */
+export function bandRows(share: number[], totalRows: number, standard = 0.105): number {
+  const looksLikeBand = (rows: number[]) =>
+    rows.length > 0 && rows.reduce((a, b) => a + b, 0) / rows.length >= 0.55 && Math.min(...rows) >= 0.3;
+  const end = share.findIndex((s) => s < 0.2);
+  const run = end === -1 ? share.length : end;
+  if (run < totalRows * 0.05) return 0;
+  if (run > totalRows * 0.14) {
+    const std = Math.round(totalRows * standard);
+    return looksLikeBand(share.slice(0, std)) ? std : 0;
+  }
+  return looksLikeBand(share.slice(0, run)) ? run : 0;
 }
