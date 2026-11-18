@@ -28,17 +28,25 @@ const WORDMARK_SRC: Record<Platform, string> = {
   ps3: `${import.meta.env.BASE_URL}brand/consoles/ps3-wordmark.png`,
 };
 const wordmarkImg: Partial<Record<Platform, HTMLImageElement>> = {};
+// Pictogrammes PEGI officiels (domaine public, Wikimedia Commons) : public/brand/pegi/
+const PEGI_AGES: NonNullable<Game["pegi"]>[] = [3, 7, 12, 16, 18];
+const pegiImg: Partial<Record<number, HTMLImageElement>> = {};
 let wordmarksLoading: Promise<void> | null = null;
 
 function wordmarksReady(): Promise<void> {
   if (typeof document === "undefined") return Promise.resolve();
-  wordmarksLoading ??= Promise.all(
-    (Object.keys(WORDMARK_SRC) as Platform[]).map((p) =>
+  wordmarksLoading ??= Promise.all([
+    ...(Object.keys(WORDMARK_SRC) as Platform[]).map((p) =>
       loadImage(WORDMARK_SRC[p])
         .then((img) => void (wordmarkImg[p] = img))
         .catch(() => undefined), // logo absent : le texte de secours prend le relais
     ),
-  ).then(() => undefined);
+    ...PEGI_AGES.map((age) =>
+      loadImage(`${import.meta.env.BASE_URL}brand/pegi/pegi-${age}.png`)
+        .then((img) => void (pegiImg[age] = img))
+        .catch(() => undefined),
+    ),
+  ]).then(() => undefined);
   return wordmarksLoading;
 }
 
@@ -167,6 +175,12 @@ function drawBand(ctx: CanvasRenderingContext2D, platform: Platform, w: number, 
 /** Pictogramme PEGI européen : âge sur fond de couleur, « www.pegi.info » sur bande blanche. */
 function drawPegi(ctx: CanvasRenderingContext2D, pegi: Game["pegi"], x: number, y: number, size: number) {
   if (!pegi) return;
+  const official = pegiImg[pegi];
+  if (official) {
+    // pictogramme officiel : largeur `size`, proportions d'origine (chiffres, bord noir, www.pegi.info)
+    ctx.drawImage(official, x, y, size, (size * official.height) / official.width);
+    return;
+  }
   const strip = size * 0.24;
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(x - 2, y - 2, size + 4, size + strip + 4);
@@ -380,15 +394,8 @@ export function spineTexture(game: Game, base: string): HTMLCanvasElement {
   const [line] = wrapText(game.title.toUpperCase(), H - top - 190, (s) => ctx.measureText(s).width, 1);
   ctx.fillText(line ?? "", 0, 0);
   ctx.restore();
-  if (game.pegi) {
-    ctx.fillStyle = pegiColor(game.pegi);
-    ctx.fillRect(12, H - 96, W - 24, 72);
-    ctx.fillStyle = "#ffffff";
-    ctx.textAlign = "center";
-    ctx.font = `700 42px ${DISPLAY}`;
-    ctx.fillText(String(game.pegi), W / 2, H - 45);
-    ctx.textAlign = "left";
-  }
+  // PEGI en pied de tranche, comme sur les boîtiers européens
+  drawPegi(ctx, game.pegi, 14, H - 108, W - 28);
   return c;
 }
 
@@ -657,15 +664,7 @@ export async function discLabel(game: Game): Promise<HTMLCanvasElement> {
   ctx.fillStyle = game.platform === "ps5" ? "rgba(0,0,0,.4)" : "rgba(255,255,255,.4)";
   ctx.fillRect(R - 200, top + 118, 400, 4);
   ctx.fillRect(R - 150, top + 132, 300, 4);
-  if (game.pegi) {
-    ctx.fillStyle = pegiColor(game.pegi);
-    ctx.fillRect(S * 0.78, R + 30, 70, 70);
-    ctx.fillStyle = "#ffffff";
-    ctx.textAlign = "center";
-    ctx.font = `700 44px ${DISPLAY}`;
-    ctx.fillText(String(game.pegi), S * 0.78 + 35, R + 82);
-    ctx.textAlign = "left";
-  }
+  drawPegi(ctx, game.pegi, S * 0.78, R + 24, 64);
   // Zone transparente centrale (moyeu), comme sur un vrai disque.
   const hub = ctx.createRadialGradient(R, R, 0, R, R, R * 0.33);
   hub.addColorStop(0, "rgba(230,234,242,1)");
