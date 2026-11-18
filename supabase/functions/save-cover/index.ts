@@ -46,9 +46,74 @@ async function underQuota(supabase: ReturnType<typeof createClient>, fn: string)
   return data === true;
 }
 
-const MAX_BYTES = 5 * 1024 * 1024;
+const MAX_BYTES = 5 * 1024 * 1024; // même plafond que le bucket « covers »
 // Identifiant strict : on ne télécharge que depuis le CDN d'IGDB (pas de requête vers une URL arbitraire).
 const IMAGE_ID = /^[a-z0-9]{4,40}$/;
+const IGDB_IMAGES = "https://images.igdb.com/igdb/image/upload";
+// Du plus grand au plus petit : t_cover_big est la miniature déjà affichée dans les résultats,
+// elle sert de dernier recours si la grande taille est absente, trop lourde ou refusée.
+const COVER_SIZES = ["t_1080p", "t_720p", "t_cover_big"];
+const SHOT_SIZES = ["t_screenshot_big", "t_screenshot_med"];
+
+/** Type réel de l'image d'après ses premiers octets (le bucket n'accepte que JPEG, PNG et WebP). */
+function imageType(b: Uint8Array): string | null {
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "image/jpeg";
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return "image/png";
+  const ascii = (from: number, to: number) => String.fromCharCode(...b.subarray(from, to));
+  if (ascii(0, 4) === "RIFF" && ascii(8, 12) === "WEBP") return "image/webp";
+  return null;
+}
+
+/**
+ * Télécharge une image du CDN d'IGDB. Les redirections sont suivies (3 au plus),
+ * seulement en HTTPS et vers un hôte igdb.com.
+ */
+async function download(size: string, id: string): Promise<{ bytes: Uint8Array; type: string }> {
+  let url = new URL(`${IGDB_IMAGES}/${size}/${id}.jpg`);
+  for (let hop = 0; hop <= 3; hop++) {
+    const res = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(15000) });
+    if (res.status >= 300 && res.status < 400) {
+      await res.body?.cancel();
+      const next = new URL(res.headers.get("location") ?? "", url);
+      const host = next.hostname;
+      if (next.protocol !== "https:" || !(host === "igdb.com" || host.endsWith(".igdb.com"))) {
+        throw new Error(`Redirection IGDB refusée : ${next.host}`);
+      }
+      url = next;
+      continue;
+    }
+    if (!res.ok) {
+      await res.body?.cancel();
+      throw new Error(`Image IGDB ${size}/${id} introuvable (${res.status})`);
+    }
+    if (Number(res.headers.get("content-length") ?? 0) > MAX_BYTES) {
+      await res.body?.cancel();
+      throw new Error(`Image IGDB ${size}/${id} trop lourde`);
+    }
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    if (bytes.byteLength > MAX_BYTES) throw new Error(`Image IGDB ${size}/${id} trop lourde (${bytes.byteLength} o)`);
+    const type = imageType(bytes);
+    if (!type) throw new Error(`Réponse IGDB ${size}/${id} qui n'est pas une image (${res.headers.get("content-type")})`);
+    return { bytes, type };
+  }
+  throw new Error("Trop de redirections IGDB");
+}
+
+/** Première taille qui se télécharge ; les échecs intermédiaires restent dans les journaux. */
+async function downloadFirst(sizes: string[], id: string): Promise<{ bytes: Uint8Array; type: string }> {
+  let last: unknown;
+  for (const size of sizes) {
+    try {
+      return await download(size, id);
+    } catch (e) {
+      console.warn((e as Error).message);
+      last = e;
+    }
+  }
+  throw last;
+}
+
+const EXT: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
@@ -74,21 +139,18 @@ Deno.serve(async (req) => {
       ? screenshot_ids.filter((s: unknown) => typeof s === "string" && IMAGE_ID.test(s)).slice(0, 3)
       : [];
 
-    async function copy(size: string, id: string, prefix: string): Promise<string> {
-      const img = await fetch(`https://images.igdb.com/igdb/image/upload/${size}/${id}.jpg`, { redirect: "error" });
-      if (!img.ok) throw new Error(`Image IGDB introuvable (${img.status})`);
-      const bytes = new Uint8Array(await img.arrayBuffer());
-      if (bytes.byteLength > MAX_BYTES) throw new Error("Image trop lourde");
-      const path = `${uid}/${prefix}-${id}.jpg`;
-      const { error } = await supabase.storage.from("covers").upload(path, bytes, { contentType: "image/jpeg", upsert: true });
-      if (error) throw error;
+    async function copy(sizes: string[], id: string, prefix: string): Promise<string> {
+      const { bytes, type } = await downloadFirst(sizes, id);
+      const path = `${uid}/${prefix}-${id}.${EXT[type]}`;
+      const { error } = await supabase.storage.from("covers").upload(path, bytes, { contentType: type, upsert: true });
+      if (error) throw new Error(`Dépôt de ${path} refusé : ${error.message}`);
       return supabase.storage.from("covers").getPublicUrl(path).data.publicUrl;
     }
 
-    const url = await copy("t_1080p", image_id, "igdb");
+    const url = await copy(COVER_SIZES, image_id, "igdb");
     // Les captures sont un plus : une capture qui échoue n'empêche pas l'ajout du jeu.
     const screenshots = (
-      await Promise.allSettled(shots.map((s) => copy("t_screenshot_big", s, "shot")))
+      await Promise.allSettled(shots.map((s) => copy(SHOT_SIZES, s, "shot")))
     ).flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
 
     return json(req, { url, screenshots });

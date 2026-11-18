@@ -2,6 +2,13 @@ import { generatedCover } from "./canvasArt";
 import { supabase } from "./supabase";
 import type { CoverCandidate, Game, GamePatch, Platform } from "./types";
 
+/** Message d'erreur renvoyé par une fonction Supabase (ex. quota atteint), sinon le message par défaut. */
+async function functionMessage(error: unknown, fallback: string): Promise<string> {
+  const ctx = (error as { context?: Response }).context;
+  const body = ctx && typeof ctx.json === "function" ? await ctx.json().catch(() => null) : null;
+  return typeof body?.error === "string" && body.error ? body.error : fallback;
+}
+
 /**
  * Cherche des jeux correspondant au titre lu sur la photo.
  * En production : fonction Supabase « search-cover » (base IGDB, filtrée par plateforme).
@@ -27,7 +34,7 @@ export async function searchCovers(query: string, platform: Platform): Promise<C
   const { data, error } = await supabase.functions.invoke<{ results: CoverCandidate[] }>("search-cover", {
     body: { query: q, platform },
   });
-  if (error) throw new Error("La recherche n'a pas abouti. Vérifie ta connexion puis réessaie.");
+  if (error) throw new Error(await functionMessage(error, "La recherche n'a pas abouti. Vérifie ta connexion puis réessaie."));
   return data?.results ?? [];
 }
 
@@ -42,7 +49,8 @@ export async function saveCover(c: CoverCandidate, platform: Platform): Promise<
   const { data, error } = await supabase.functions.invoke<{ url: string; screenshots: string[] }>("save-cover", {
     body: { image_id: c.image_id, screenshot_ids: c.screenshot_ids },
   });
-  if (error || !data?.url) throw new Error("La jaquette n'a pas pu être enregistrée. Réessaie dans un instant.");
+  if (error) throw new Error(await functionMessage(error, "La jaquette n'a pas pu être enregistrée. Réessaie dans un instant."));
+  if (!data?.url) throw new Error("La jaquette n'a pas pu être enregistrée. Réessaie dans un instant.");
   return { url: data.url, screenshots: data.screenshots ?? [] };
 }
 
@@ -93,11 +101,7 @@ export async function fetchScans(game: Pick<Game, "title" | "platform" | "back_u
   const { data, error } = await supabase.functions.invoke<{ back_url: string | null; disc_url: string | null; found: boolean }>("fetch-scans", {
     body: { title: game.title, platform: game.platform },
   });
-  if (error) {
-    const ctx = (error as { context?: Response }).context;
-    const body = ctx && typeof ctx.json === "function" ? await ctx.json().catch(() => null) : null;
-    throw new Error(body?.error ?? "Les scans n'ont pas pu être récupérés. Réessaie plus tard.");
-  }
+  if (error) throw new Error(await functionMessage(error, "Les scans n'ont pas pu être récupérés. Réessaie plus tard."));
   const patch: GamePatch = {};
   if (!game.back_url && data?.back_url) patch.back_url = data.back_url;
   if (!game.disc_url && data?.disc_url) patch.disc_url = data.disc_url;
