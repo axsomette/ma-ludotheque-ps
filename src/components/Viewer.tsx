@@ -4,7 +4,8 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { metaLine, mix } from "../lib/artUtils";
 import { dominantColor } from "../lib/canvasArt";
 import { coverSrc } from "./Library";
-import { fetchDetails, needsDetails, uploadPhoto, type PhotoKind } from "../lib/covers";
+import { fetchDetails, fetchScans, needsDetails, ScansUnavailable, uploadPhoto, type PhotoKind } from "../lib/covers";
+import { isDemo } from "../lib/supabase";
 import { PLATFORMS } from "../lib/platforms";
 import { updateGame } from "../lib/store";
 import type { Game } from "../lib/types";
@@ -49,7 +50,8 @@ export function Viewer({ game, initialMode = "front", onClose, onDelete, onUpdat
   const [mode, setMode] = useState<CaseMode>(initialMode);
   const [flipped, setFlipped] = useState(false);
   const [tint, setTint] = useState("#2a3558");
-  const [busy, setBusy] = useState<PhotoKind | "delete" | "details" | null>(null);
+  const [busy, setBusy] = useState<PhotoKind | "delete" | "details" | "scans" | null>(null);
+  const [scanNote, setScanNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [moreSummary, setMoreSummary] = useState(false);
   const backInput = useRef<HTMLInputElement>(null);
@@ -114,6 +116,27 @@ export function Viewer({ game, initialMode = "front", onClose, onDelete, onUpdat
       onUpdate(await updateGame(game.id, patch));
     } catch (e) {
       setError((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function realScans() {
+    setBusy("scans");
+    setError(null);
+    setScanNote(null);
+    try {
+      const patch = await fetchScans(game);
+      if (!Object.keys(patch).length) {
+        setScanNote("Aucun scan de dos ou de disque trouvé pour ce jeu sur ScreenScraper.");
+        return;
+      }
+      const updated = await updateGame(game.id, patch);
+      onUpdate(updated);
+      changeMode(patch.back_url ? "back" : "disc");
+    } catch (e) {
+      if (e instanceof ScansUnavailable) setScanNote(e.message);
+      else setError((e as Error).message);
     } finally {
       setBusy(null);
     }
@@ -216,8 +239,18 @@ export function Viewer({ game, initialMode = "front", onClose, onDelete, onUpdat
         )}
 
         <section className="photos" aria-labelledby="photos-title">
-          <h3 id="photos-title">Photos du vrai boîtier</h3>
-          <p className="muted small">Remplace le dos et le disque générés par tes propres photos.</p>
+          <h3 id="photos-title">Vrai dos, vrai disque</h3>
+          {!isDemo && (!game.back_url || !game.disc_url) && (
+            <>
+              <p className="muted small">Récupère les scans de la version française ou européenne sur ScreenScraper.</p>
+              <button className="btn" onClick={realScans} disabled={busy !== null}>
+                {busy === "scans" ? <DiscSpinner size={20} /> : <IconDisc />}
+                {busy === "scans" ? "Recherche des scans…" : "Récupérer les vrais scans"}
+              </button>
+              {scanNote && <p className="muted small" role="status">{scanNote}</p>}
+            </>
+          )}
+          <p className="muted small">Ou remplace-les par tes propres photos.</p>
           <div className="photo-actions">
             <button className="btn" onClick={() => backInput.current?.click()} disabled={busy !== null}>
               <IconCamera />

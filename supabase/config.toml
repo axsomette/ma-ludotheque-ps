@@ -9,3 +9,6 @@ verify_jwt = false
 
 [functions.save-cover]
 verify_jwt = false
+
+[functions.fetch-scans]
+verify_jwt = false

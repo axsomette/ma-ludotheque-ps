@@ -41,3 +41,10 @@ describe("pickSameGame", () => {
     expect(pickSameGame(results, null, "Gran Turismo")).toBeNull();
   });
 });
+
+describe("fetchScans", () => {
+  it("annonce clairement qu'il n'y a pas de vrais scans en mode démo", async () => {
+    const { fetchScans, ScansUnavailable } = await import("../src/lib/covers");
+    await expect(fetchScans({ title: "Gran Turismo 7", platform: "ps5", back_url: null, disc_url: null })).rejects.toBeInstanceOf(ScansUnavailable);
+  });
+});

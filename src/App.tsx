@@ -9,7 +9,8 @@ import { DiscSpinner, Logo } from "./components/Logo";
 import { generatedCover } from "./lib/canvasArt";
 import { mix } from "./lib/artUtils";
 import { PLATFORMS, PLATFORM_ORDER } from "./lib/platforms";
-import { addGame, deleteGame, listGames } from "./lib/store";
+import { fetchScans } from "./lib/covers";
+import { addGame, deleteGame, listGames, updateGame } from "./lib/store";
 import { isDemo, supabase } from "./lib/supabase";
 import type { Game, NewGame, Platform } from "./lib/types";
 
@@ -224,6 +225,16 @@ export default function App() {
             const created = await addGame(g);
             setGames((list) => [created, ...list]);
             open(created);
+            // Vrais scans du dos et du disque (ScreenScraper) en tâche de fond : un échec ne gêne pas l'ajout.
+            if (!isDemo)
+              fetchScans(created)
+                .then((patch) => (Object.keys(patch).length ? updateGame(created.id, patch) : null))
+                .then((updated) => {
+                  if (!updated) return;
+                  setGames((list) => list.map((x) => (x.id === updated.id ? updated : x)));
+                  setViewing((v) => (v && v.game.id === updated.id ? { ...v, game: updated } : v));
+                })
+                .catch(() => undefined);
           }}
         />
       )}
