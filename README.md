@@ -15,7 +15,7 @@ On photographie un jeu, la jaquette est retrouvée, et le boîtier s'ouvre sur s
 
 **[Ouvrir l'appli →](https://axsomette.github.io/ma-ludotheque-ps/)**
 
-<img src="docs/boitiers.png" alt="Trois boîtiers 3D : PS5 bleu translucide à bandeau blanc, PS4 bleu à bandeau bleu, PS3 noir laqué" width="860">
+<img src="docs/boitiers.png" alt="Trois boîtiers 3D rendus par l'appli : Astro Bot (PS5, plastique bleu translucide, bandeau blanc), God of War (PS4, bandeau bleu), The Last of Us (PS3, noir laqué)" width="860">
 
 </div>
 
@@ -31,7 +31,7 @@ On photographie un jeu, la jaquette est retrouvée, et le boîtier s'ouvre sur s
 | **Dans la poche** | PWA installable sur iPhone et Android, interface disponible hors ligne, un compte e-mail + mot de passe et ta collection te suit partout. |
 
 <p align="center">
-  <img src="docs/manipuler.png" alt="Le boîtier ouvert, le disque sorti, le dos du boîtier" width="860">
+  <img src="docs/manipuler.png" alt="Astro Bot ouvert sur son disque, le dos européen de God of War, le disque de The Last of Us sorti du boîtier" width="860">
 </p>
 
 Toucher un boîtier l'ouvre en 3D, aux proportions d'un vrai boîtier (135 × 171 × 15 mm) :
@@ -53,7 +53,7 @@ Au clavier : `F` face, `D` dos, `O` ouvrir, `X` disque, `Espace` ouvrir / fermer
   </tr>
 </table>
 
-> Sans configuration, l'appli démarre en **mode démo** : quatre jeux d'exemple, la collection reste dans le navigateur.
+> Sans configuration, l'appli démarre en **mode démo** : des jeux d'exemple aux jaquettes générées, la collection reste dans le navigateur.
 
 ## Comment ça marche
 
@@ -184,7 +184,7 @@ Une faille ? Merci de la signaler en privé via les [GitHub Security Advisories]
 
 ## Crédits et limites
 
-- Jaquettes et données : [IGDB](https://www.igdb.com/). Scans du dos et du disque : [LaunchBox Games DB](https://gamesdb.launchbox-app.com/). Ces images restent la propriété de leurs éditeurs : **usage personnel uniquement**.
+- Jaquettes et données : [IGDB](https://www.igdb.com/). Scans du dos et du disque : [LaunchBox Games DB](https://gamesdb.launchbox-app.com/). Ces images restent la propriété de leurs éditeurs : **usage personnel uniquement**. Les jeux visibles sur les captures de ce README (Astro Bot, Gran Turismo, God of War, Ghost of Tsushima, The Last of Us) illustrent le fonctionnement de l'appli ; leurs visuels appartiennent à leurs éditeurs.
 - Logotypes PlayStation et pictogrammes PEGI : versions du domaine public sur [Wikimedia Commons](https://commons.wikimedia.org/). « PlayStation », « PS5 », « PS4 » et « PS3 » sont des marques de Sony Interactive Entertainment ; ce projet n'est ni affilié ni approuvé par Sony.
 - La lecture du titre dépend de la photo (jaquette de face, bien éclairée) ; le titre lu reste modifiable avant la recherche.
 
