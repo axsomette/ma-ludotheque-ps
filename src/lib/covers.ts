@@ -85,7 +85,7 @@ export async function fetchDetails(game: Game): Promise<GamePatch | null> {
 export class ScansUnavailable extends Error {}
 
 /**
- * Vrais scans ScreenScraper (dos et disque, version française ou européenne en priorité).
+ * Vrais scans LaunchBox Games DB (dos et disque, version européenne en priorité), via la fonction fetch-scans.
  * Ne renvoie que ce qui manque au jeu : une photo prise par l'utilisateur n'est jamais remplacée.
  */
 export async function fetchScans(game: Pick<Game, "title" | "platform" | "back_url" | "disc_url">): Promise<GamePatch> {
@@ -96,7 +96,6 @@ export async function fetchScans(game: Pick<Game, "title" | "platform" | "back_u
   if (error) {
     const ctx = (error as { context?: Response }).context;
     const body = ctx && typeof ctx.json === "function" ? await ctx.json().catch(() => null) : null;
-    if (body?.code === "not_configured") throw new ScansUnavailable("ScreenScraper n'est pas encore configuré.");
     throw new Error(body?.error ?? "Les scans n'ont pas pu être récupérés. Réessaie plus tard.");
   }
   const patch: GamePatch = {};

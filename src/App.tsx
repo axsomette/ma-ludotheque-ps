@@ -231,7 +231,7 @@ export default function App() {
             const created = await addGame(g);
             setGames((list) => [created, ...list]);
             open(created);
-            // Vrais scans du dos et du disque (ScreenScraper) en tâche de fond : un échec ne gêne pas l'ajout.
+            // Vrais scans du dos et du disque (LaunchBox) en tâche de fond : un échec ne gêne pas l'ajout.
             if (!isDemo)
               fetchScans(created)
                 .then((patch) => (Object.keys(patch).length ? updateGame(created.id, patch) : null))

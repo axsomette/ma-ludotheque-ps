@@ -46,7 +46,7 @@ Vitest : calculs de couleurs et PEGI, découpe des textes du dos, détection de 
 | `src/lib/ocr.ts` | Lecture du titre (Tesseract.js), **dans le navigateur** : la photo n'est envoyée nulle part |
 | `supabase/migrations/` | Table `games`, règles RLS (chacun ne voit que ses jeux), bucket `covers` |
 | `supabase/functions/search-cover` | Recherche IGDB filtrée PS3/PS4/PS5. Les clés Twitch restent côté serveur |
-| `supabase/functions/fetch-scans` | Vrais scans du dos et du disque sur ScreenScraper (version FR/EU d'abord) ; numéros de systèmes et médias relevés dans Skyscraper |
+| `supabase/functions/fetch-scans` | Vrais scans du dos et du disque sur LaunchBox Games DB (version européenne d'abord), sans compte ; lecture des pages dans `launchbox.ts` (testée) |
 | `supabase/functions/save-cover` | Copie la grande jaquette dans `covers/<user_id>/` (évite les blocages CORS en 3D) |
 
 ## Mise en route
@@ -86,13 +86,14 @@ Vitest : calculs de couleurs et PEGI, découpe des textes du dos, détection de 
    Désactiver **« Verify JWT with legacy secret »** sur les deux (déjà fait par `config.toml` avec la CLI) :
    avec les nouvelles clés de signature, c'est la fonction qui vérifie elle-même la session et renvoie 401 sinon.
 
-### 3. Vrais scans (ScreenScraper, facultatif)
+### 3. Vrais scans (LaunchBox Games DB)
 
-1. Créer un compte sur [screenscraper.fr](https://www.screenscraper.fr/) et demander des identifiants développeur à l'équipe (forum, rubrique développeurs).
-2. Secrets des fonctions : `SS_DEVID`, `SS_DEVPASSWORD`, `SS_SOFTNAME` (nom déclaré), et, pour un meilleur quota, `SS_USER` et `SS_PASSWORD` (le compte ScreenScraper).
-3. Déployer la fonction `fetch-scans` (même procédure que les deux autres, « Verify JWT » désactivé).
+Aucun compte ni secret : la fonction `fetch-scans` lit les pages publiques de [LaunchBox Games DB](https://gamesdb.launchbox-app.com/)
+(recherche, puis page « images » du jeu), choisit « Box - Back » et « Disc » en version européenne d'abord, et copie les images
+dans le stockage `covers`. Déployer `index.ts` **et** `launchbox.ts` (« Verify JWT » désactivé).
 
-Sans ces secrets, l'appli fonctionne normalement : le dos et le disque restent générés.
+Pas d'API officielle : si LaunchBox change sa mise en page, adapter `launchbox.ts` (les tests `tests/launchbox.test.ts` le signalent).
+Jeu absent ou sans scan : le dos et le disque restent générés, ou photographiés.
 
 ### 4. GitHub Pages
 

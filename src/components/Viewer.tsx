@@ -128,7 +128,7 @@ export function Viewer({ game, initialMode = "front", onClose, onDelete, onUpdat
     try {
       const patch = await fetchScans(game);
       if (!Object.keys(patch).length) {
-        setScanNote("Aucun scan de dos ou de disque trouvé pour ce jeu sur ScreenScraper.");
+        setScanNote("Aucun scan de dos ou de disque trouvé pour ce jeu sur LaunchBox. Tu peux photographier les tiens.");
         return;
       }
       const updated = await updateGame(game.id, patch);
@@ -242,7 +242,7 @@ export function Viewer({ game, initialMode = "front", onClose, onDelete, onUpdat
           <h3 id="photos-title">Vrai dos, vrai disque</h3>
           {!isDemo && (!game.back_url || !game.disc_url) && (
             <>
-              <p className="muted small">Récupère les scans de la version française ou européenne sur ScreenScraper.</p>
+              <p className="muted small">Récupère les vrais scans sur LaunchBox Games DB, version européenne en priorité.</p>
               <button className="btn" onClick={realScans} disabled={busy !== null}>
                 {busy === "scans" ? <DiscSpinner size={20} /> : <IconDisc />}
                 {busy === "scans" ? "Recherche des scans…" : "Récupérer les vrais scans"}
