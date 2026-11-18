@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { IconEye, IconEyeOff, IconMail } from "./icons";
 import { coverSrc } from "./Library";
 import { Logo } from "./Logo";
+import { Turnstile, TURNSTILE_SITE_KEY, type TurnstileHandle } from "./Turnstile";
 import type { Platform } from "../lib/types";
 
 // Boîtiers d'ambiance derrière la carte (jaquettes générées, aucun vrai jeu).
@@ -27,6 +28,7 @@ export function authMessage(raw: string): string {
   if (m.includes("rate limit") || m.includes("too many")) return "Trop de tentatives. Attends quelques minutes puis réessaie.";
   if (m.includes("signups not allowed") || m.includes("signup is disabled")) return "Les inscriptions sont fermées pour le moment.";
   if (m.includes("same password") || m.includes("different from the old")) return "Choisis un mot de passe différent de l'ancien.";
+  if (m.includes("captcha")) return "La vérification anti-robots a échoué ou a expiré. Recommence-la puis réessaie.";
   return "Ça n'a pas marché. Vérifie ta connexion puis réessaie.";
 }
 
@@ -62,6 +64,10 @@ export function Login({ recovery = false, onRecovered }: { recovery?: boolean; o
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  // Jeton Turnstile (vérification anti-robots) : à usage unique, renouvelé après chaque tentative.
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captcha = useRef<TurnstileHandle>(null);
+  const needsCaptcha = !recovery && !!TURNSTILE_SITE_KEY;
 
   function switchTo(m: Mode) {
     setMode(m);
@@ -77,6 +83,11 @@ export function Login({ recovery = false, onRecovered }: { recovery?: boolean; o
       setError(`Le mot de passe doit faire au moins ${MIN_PASSWORD} caractères.`);
       return;
     }
+    if (needsCaptcha && !captchaToken) {
+      setError("Termine la vérification anti-robots juste au-dessus du bouton.");
+      return;
+    }
+    const opts = captchaToken ? { captchaToken } : {};
     setBusy(true);
     try {
       const auth = supabase!.auth;
@@ -85,16 +96,16 @@ export function Login({ recovery = false, onRecovered }: { recovery?: boolean; o
         if (error) throw error;
         onRecovered?.();
       } else if (mode === "signin") {
-        const { error } = await auth.signInWithPassword({ email, password });
+        const { error } = await auth.signInWithPassword({ email, password, options: opts });
         if (error) throw error;
       } else if (mode === "signup") {
-        const { data, error } = await auth.signUp({ email, password, options: { emailRedirectTo: redirectTo() } });
+        const { data, error } = await auth.signUp({ email, password, options: { emailRedirectTo: redirectTo(), ...opts } });
         if (error) throw error;
         // Adresse déjà inscrite : Supabase renvoie un utilisateur sans identité, sans le dire.
         if (data.user && data.user.identities?.length === 0) throw new Error("already registered");
         if (!data.session) setInfo(`Compte créé. Ouvre le lien envoyé à ${email} pour l'activer, puis connecte-toi.`);
       } else {
-        const { error } = await auth.resetPasswordForEmail(email, { redirectTo: redirectTo() });
+        const { error } = await auth.resetPasswordForEmail(email, { redirectTo: redirectTo(), ...opts });
         if (error) throw error;
         setInfo(`Si un compte existe pour ${email}, un lien pour changer de mot de passe vient d'y être envoyé.`);
       }
@@ -102,6 +113,7 @@ export function Login({ recovery = false, onRecovered }: { recovery?: boolean; o
       setError(authMessage((err as Error).message ?? ""));
     } finally {
       setBusy(false);
+      if (needsCaptcha) captcha.current?.reset(); // un jeton ne sert qu'une fois
     }
   }
 
@@ -148,6 +160,7 @@ export function Login({ recovery = false, onRecovered }: { recovery?: boolean; o
             />
           )}
           {(mode === "signup" || recovery) && <p className="muted small hint">Au moins {MIN_PASSWORD} caractères.</p>}
+          {needsCaptcha && <Turnstile ref={captcha} onToken={setCaptchaToken} />}
           <button className="btn primary wide" disabled={busy} aria-busy={busy}>
             {mode === "forgot" && <IconMail />}
             {busy ? "Un instant…" : cta}

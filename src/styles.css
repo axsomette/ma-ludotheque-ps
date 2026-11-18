@@ -345,6 +345,7 @@ input::placeholder { color: #6c7590; }
 .login-card .segmented button { flex: 1; justify-content: center; }
 .login-title { margin: 0; font: 700 20px/1.2 var(--display); text-transform: uppercase; letter-spacing: 0.04em; }
 .login-card .hint { margin: -4px 0 0; }
+.turnstile { min-height: 65px; display: flex; justify-content: center; }
 .password { position: relative; display: block; }
 .password input { padding-right: 52px; }
 .password .icon-btn { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); }

@@ -107,7 +107,8 @@ flowchart LR
    supabase db push
    ```
 3. **Comptes e-mail + mot de passe** (Authentication → Sign In / Providers) : Email activé, inscriptions autorisées. Sans serveur SMTP personnalisé, Supabase n'envoie d'e-mails qu'aux membres de l'organisation : désactiver « Confirm email », ou brancher un SMTP (Authentication → Emails).
-4. Authentication → URL Configuration : **Site URL** `https://<compte>.github.io/ma-ludotheque-ps/`, **Redirect URLs** la même adresse plus `http://localhost:5173/`.
+4. **Anti-robots (facultatif, recommandé)** : créer un widget [Cloudflare Turnstile](https://dash.cloudflare.com/?to=/:account/turnstile) (domaines `<compte>.github.io` et `localhost`), mettre sa **clé du site** dans la variable GitHub `VITE_TURNSTILE_SITE_KEY`, déployer, puis coller sa **clé secrète** dans Authentication → Attack Protection → Captcha (Turnstile). Dans cet ordre : une fois le CAPTCHA activé, toute connexion sans jeton est refusée.
+5. Authentication → URL Configuration : **Site URL** `https://<compte>.github.io/ma-ludotheque-ps/`, **Redirect URLs** la même adresse plus `http://localhost:5173/`.
 
 </details>
 
