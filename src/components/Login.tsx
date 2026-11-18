@@ -1,19 +1,8 @@
 import { useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { IconEye, IconEyeOff, IconMail } from "./icons";
-import { coverSrc } from "./Library";
 import { Logo } from "./Logo";
 import { Turnstile, TURNSTILE_SITE_KEY, type TurnstileHandle } from "./Turnstile";
-import type { Platform } from "../lib/types";
-
-// Boîtiers d'ambiance derrière la carte (jaquettes générées, aucun vrai jeu).
-const DECOR: Array<{ title: string; platform: Platform }> = [
-  { title: "Neon Drift", platform: "ps5" },
-  { title: "Gridiron Legends", platform: "ps5" },
-  { title: "Les Terres d'Aube", platform: "ps4" },
-  { title: "Canyon Run", platform: "ps3" },
-  { title: "Orbit Zero", platform: "ps4" },
-];
 
 const MIN_PASSWORD = 8;
 const redirectTo = () => window.location.origin + import.meta.env.BASE_URL;
@@ -122,11 +111,6 @@ export function Login({ recovery = false, onRecovered }: { recovery?: boolean; o
 
   return (
     <main className="login">
-      <div className="login-decor" aria-hidden>
-        {DECOR.map((d) => (
-          <img key={d.title} src={coverSrc({ ...d, cover_url: null })} alt="" />
-        ))}
-      </div>
       <div className="login-card">
         <Logo size={72} />
         <h1 className="wordmark big">Ludothèque</h1>

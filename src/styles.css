@@ -326,13 +326,6 @@ input::placeholder { color: #6c7590; }
 
 /* ---------- Connexion ---------- */
 .login { min-height: 100dvh; display: grid; place-items: center; padding: 24px 16px; position: relative; overflow: hidden; }
-.login-decor {
-  position: absolute; left: 50%; bottom: 3%; display: flex; gap: 22px; transform: translateX(-50%) perspective(900px) rotateX(18deg);
-  opacity: 0.6; pointer-events: none;
-}
-.login-decor img { width: clamp(110px, 16vw, 170px); aspect-ratio: 135 / 171; object-fit: cover; border-radius: 4px; box-shadow: 0 24px 40px -14px #000; }
-.login-decor img:nth-child(odd) { transform: translateY(-18px); }
-.login::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, var(--void) 20%, rgba(7, 9, 15, 0.55) 70%, rgba(7, 9, 15, 0.85)); pointer-events: none; }
 .login-card {
   position: relative; z-index: 1; width: min(420px, 100%); display: grid; gap: 16px; justify-items: center; text-align: center; padding: 36px 24px;
   background: rgba(14, 18, 32, 0.82); border: 1px solid var(--wire); border-radius: 12px; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
