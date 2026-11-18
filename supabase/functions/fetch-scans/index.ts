@@ -52,10 +52,25 @@ const LB = "https://gamesdb.launchbox-app.com";
 const UA = "ma-ludotheque/1.0 (collection personnelle de jeux PlayStation)";
 const MAX_BYTES = 5 * 1024 * 1024; // même plafond que le bucket « covers »
 
+/**
+ * Page de LaunchBox. Le site redirige /games/images/<id> vers /games/images/<id>-<titre> :
+ * on suit au plus 3 redirections, et seulement si elles restent sur gamesdb.launchbox-app.com en HTTPS.
+ */
 async function page(path: string): Promise<string> {
-  const res = await fetch(LB + path, { headers: { "User-Agent": UA, Accept: "text/html" }, signal: AbortSignal.timeout(12000), redirect: "error" });
-  if (!res.ok) throw new Error(`LaunchBox indisponible (${res.status})`);
-  return res.text();
+  let url = new URL(LB + path);
+  for (let hop = 0; hop <= 3; hop++) {
+    const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "text/html" }, signal: AbortSignal.timeout(12000), redirect: "manual" });
+    if (res.status >= 300 && res.status < 400) {
+      await res.body?.cancel();
+      const next = new URL(res.headers.get("location") ?? "", url);
+      if (next.protocol !== "https:" || next.hostname !== url.hostname) throw new Error(`Redirection LaunchBox refusée : ${next.host}`);
+      url = next;
+      continue;
+    }
+    if (!res.ok) throw new Error(`LaunchBox indisponible (${res.status})`);
+    return res.text();
+  }
+  throw new Error("Trop de redirections LaunchBox");
 }
 
 Deno.serve(async (req) => {
