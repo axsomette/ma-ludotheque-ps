@@ -134,6 +134,9 @@ export function Viewer({ game, initialMode = "front", onClose, onDelete, onUpdat
       const updated = await updateGame(game.id, patch);
       onUpdate(updated);
       changeMode(patch.back_url ? "back" : "disc");
+      // Ce qui manque encore : on le dit, plutôt que de laisser le bouton sans explication.
+      if (!updated.disc_url) setScanNote("Dos récupéré. Pas de scan du disque pour ce jeu sur LaunchBox : photographie le tien si tu veux.");
+      else if (!updated.back_url) setScanNote("Disque récupéré. Pas de scan du dos pour ce jeu sur LaunchBox : photographie le tien si tu veux.");
     } catch (e) {
       if (e instanceof ScansUnavailable) setScanNote(e.message);
       else setError((e as Error).message);
