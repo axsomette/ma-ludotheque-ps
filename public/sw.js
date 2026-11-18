@@ -3,7 +3,7 @@
 // - Page d'accueil : réseau d'abord (pour recevoir les mises à jour), cache en secours.
 // - Fichiers versionnés (assets/…) et polices : cache d'abord.
 // - Données Supabase, IGDB, Twitch : jamais mises en cache (toujours fraîches, jamais de données d'un autre compte).
-const VERSION = "ludotheque-v2";
+const VERSION = "ludotheque-v3";
 const SHELL = ["./", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/icon.svg", "favicon.ico"];
 
 self.addEventListener("install", (event) => {

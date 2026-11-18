@@ -1,13 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><title>Ma ludothèque</title>
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#161C30"/><stop offset="1" stop-color="#07090F"/></linearGradient>
-    <linearGradient id="iris" x1="0.1" y1="0.1" x2="0.9" y2="0.9">
-      <stop offset="0" stop-color="#7AF0FF"/><stop offset="0.33" stop-color="#B48CFF"/><stop offset="0.66" stop-color="#FF9DE2"/><stop offset="1" stop-color="#FFE08A"/>
-    </linearGradient>
-  </defs>
-  <rect width="256" height="256" rx="0" fill="url(#bg)"/>
-  <g transform="translate(128 128) scale(0.68) translate(-128 -128)">
-    <path fill="#EDF0F7" d="M50 36H128L140 48V48.4A80 80 0 0 0 105.9 60H36V50Z"/><path fill="#EDF0F7" d="M36 68H95.1A80 80 0 0 0 140 207.6V208L128 220H50L36 206Z"/>
-    <path fill="url(#iris)" fill-rule="evenodd" d="M76 128a72 72 0 1 0 144 0a72 72 0 1 0-144 0ZM130 128a18 18 0 1 0 36 0a18 18 0 1 0-36 0Z"/>
-  </g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><title>Ma ludothèque</title><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#161C30"/><stop offset="1" stop-color="#07090F"/></linearGradient><linearGradient id="iris" x1="0.1" y1="0.1" x2="0.9" y2="0.9"><stop offset="0" stop-color="#7AF0FF"/><stop offset="0.33" stop-color="#B48CFF"/><stop offset="0.66" stop-color="#FF9DE2"/><stop offset="1" stop-color="#FFE08A"/></linearGradient></defs><rect width="256" height="256" rx="0" fill="url(#bg)"/><g transform="translate(128 128) scale(0.66) translate(-128 -128)"><path fill="#C3CADB" d="M30 71.83L104 52V204L30 184.17Z"/><path fill="#EDF0F7" fill-rule="evenodd" d="M116 52H210L226 68V204H116ZM131 128a40 40 0 1 1 80 0a40 40 0 1 1 -80 0Z"/><path fill="url(#iris)" fill-rule="evenodd" d="M137 128a34 34 0 1 1 68 0a34 34 0 1 1 -68 0ZM160 128a11 11 0 1 1 22 0a11 11 0 1 1 -22 0Z"/></g></svg>

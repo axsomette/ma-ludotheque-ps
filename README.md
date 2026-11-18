@@ -24,7 +24,7 @@ Raccourcis clavier dans la vue : `F` face, `D` dos, `O` ouvrir, `X` disque, `Esp
 
 ## Sur le téléphone (PWA)
 
-L'appli s'installe comme une application : Safari → Partager → **Sur l'écran d'accueil** (iPhone), ou Chrome → **Installer l'application** (Android). L'interface reste disponible hors ligne ; les données Supabase ne sont jamais mises en cache. Le logo et ses déclinaisons sont dans `brand/` (les trois pistes étudiées dans `brand/concepts/`).
+L'appli s'installe comme une application : Safari → Partager → **Sur l'écran d'accueil** (iPhone), ou Chrome → **Installer l'application** (Android). L'interface reste disponible hors ligne ; les données Supabase ne sont jamais mises en cache. Le logo « Boîtier ouvert » et ses déclinaisons sont dans `brand/` (règles d’usage : `brand/LOGO.md`).
 
 ## Tests
 

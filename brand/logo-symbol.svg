@@ -1,3 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><title>Ma ludothèque</title>
-  <path d="M50 36H128L140 48V48.4A80 80 0 0 0 105.9 60H36V50Z"/><path d="M36 68H95.1A80 80 0 0 0 140 207.6V208L128 220H50L36 206Z"/><path fill-rule="evenodd" d="M76 128a72 72 0 1 0 144 0a72 72 0 1 0-144 0ZM130 128a18 18 0 1 0 36 0a18 18 0 1 0-36 0Z"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><title>Ma ludothèque</title><path fill="#000" d="M30 71.83L104 52V204L30 184.17Z"/><path fill="#000" fill-rule="evenodd" d="M116 52H210L226 68V204H116ZM131 128a40 40 0 1 1 80 0a40 40 0 1 1 -80 0ZM160 128a11 11 0 1 1 22 0a11 11 0 1 1 -22 0Z"/></svg>

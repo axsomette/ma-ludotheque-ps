@@ -1,9 +1,12 @@
-// Logo « Disque qui sort » : le boîtier biseauté (bandeau + corps) et le disque qu'on en sort.
-// Sources et icônes d'appli dans brand/.
+// Logo « Boîtier ouvert » : le couvercle ouvert vers nous, le plateau biseauté et le disque irisé.
+// Sources, versions une couleur et icônes d'appli dans brand/ (géométrie : brand/geometry.txt).
 import { useId } from "react";
 
-const CASE_BAND = "M50 36H128L140 48V48.4A80 80 0 0 0 105.9 60H36V50Z";
-const CASE_BODY = "M36 68H95.1A80 80 0 0 0 140 207.6V208L128 220H50L36 206Z";
+const LID = "M30 71.83L104 52V204L30 184.17Z";
+const TRAY = "M116 52H210L226 68V204H116Z";
+const HOLE = "M131 128a40 40 0 1 1 80 0a40 40 0 1 1-80 0Z";
+const DISC_ON_TRAY = "M137 128a34 34 0 1 1 68 0a34 34 0 1 1-68 0ZM160 128a11 11 0 1 1 22 0a11 11 0 1 1-22 0Z";
+// disque seul, pour l'indicateur de chargement
 const DISC = "M76 128a72 72 0 1 0 144 0a72 72 0 1 0-144 0ZM130 128a18 18 0 1 0 36 0a18 18 0 1 0-36 0Z";
 
 function Iris({ id }: { id: string }) {
@@ -25,9 +28,9 @@ export function Logo({ size = 40, title }: { size?: number; title?: string }) {
       <defs>
         <Iris id={id} />
       </defs>
-      <path fill="var(--text)" d={CASE_BAND} />
-      <path fill="var(--text)" d={CASE_BODY} />
-      <path fill={`url(#${id})`} fillRule="evenodd" d={DISC} />
+      <path fill="#C3CADB" d={LID} />
+      <path fill="var(--text)" fillRule="evenodd" d={TRAY + HOLE} />
+      <path fill={`url(#${id})`} fillRule="evenodd" d={DISC_ON_TRAY} />
     </svg>
   );
 }
