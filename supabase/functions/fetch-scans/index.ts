@@ -39,14 +39,21 @@ function publicKey(): string {
   return Deno.env.get("SUPABASE_ANON_KEY")!;
 }
 
+/** Quota d'appels par utilisateur (fonction SQL take_quota, limites fixées côté base). */
+async function underQuota(supabase: ReturnType<typeof createClient>, fn: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc("take_quota", { fn });
+  if (error) throw error; // quota illisible : on refuse (échec fermé)
+  return data === true;
+}
+
 // --- LaunchBox ---
 
 const LB = "https://gamesdb.launchbox-app.com";
 const UA = "ma-ludotheque/1.0 (collection personnelle de jeux PlayStation)";
-const MAX_BYTES = 8 * 1024 * 1024;
+const MAX_BYTES = 5 * 1024 * 1024; // même plafond que le bucket « covers »
 
 async function page(path: string): Promise<string> {
-  const res = await fetch(LB + path, { headers: { "User-Agent": UA, Accept: "text/html" }, signal: AbortSignal.timeout(12000) });
+  const res = await fetch(LB + path, { headers: { "User-Agent": UA, Accept: "text/html" }, signal: AbortSignal.timeout(12000), redirect: "error" });
   if (!res.ok) throw new Error(`LaunchBox indisponible (${res.status})`);
   return res.text();
 }
@@ -62,10 +69,13 @@ Deno.serve(async (req) => {
     const { data: auth, error: authError } = await supabase.auth.getUser();
     if (authError || !auth.user) return json(req, { error: "Non connecté" }, 401);
     const uid = auth.user.id;
+    if (!(await underQuota(supabase, "fetch-scans"))) {
+      return json(req, { error: "Trop de recherches de scans pour l'instant. Réessaie dans une heure." }, 429);
+    }
 
     const { title, platform } = await req.json();
     if (typeof title !== "string" || !title.trim() || title.length > 120) return json(req, { error: "Titre invalide" }, 400);
-    if (!(platform in LB_PLATFORM)) return json(req, { error: "Plateforme invalide" }, 400);
+    if (typeof platform !== "string" || !Object.hasOwn(LB_PLATFORM, platform)) return json(req, { error: "Plateforme invalide" }, 400);
 
     const results = parseResults(await page(`/games/results/${encodeURIComponent(title.trim())}`));
     const game = pickResult(results, title, platform as Platform);
@@ -75,7 +85,7 @@ Deno.serve(async (req) => {
     async function copy(url: string | undefined, kind: "back" | "disc", minBytes: number): Promise<string | null> {
       const safe = url ? safeImageUrl(url) : null;
       if (!safe) return null;
-      const img = await fetch(safe, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(15000) });
+      const img = await fetch(safe, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(15000), redirect: "error" });
       const type = img.headers.get("content-type") ?? "";
       if (!img.ok || !type.startsWith("image/")) return null;
       const bytes = new Uint8Array(await img.arrayBuffer());
@@ -103,7 +113,7 @@ Deno.serve(async (req) => {
       disc_url: disc.status === "fulfilled" ? disc.value : null,
     });
   } catch (e) {
-    console.error(e);
-    return json(req, { error: (e as Error).message }, 500);
+    console.error(e); // le détail reste dans les journaux, jamais dans la réponse
+    return json(req, { error: "Les scans n'ont pas pu être récupérés. Réessaie plus tard." }, 500);
   }
 });

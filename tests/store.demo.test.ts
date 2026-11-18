@@ -50,3 +50,21 @@ describe("collection en mode démo", () => {
     expect(await listGames()).toEqual([]);
   });
 });
+
+describe("ownCoverPath : seuls les fichiers de son propre dossier sont supprimables", () => {
+  const uid = "5f0c3a52-1111-4a2b-9c3d-123456789abc";
+  const base = "https://abcd.supabase.co/storage/v1/object/public/covers/";
+  it("reconnaît un fichier de l'utilisateur", async () => {
+    const { ownCoverPath } = await import("../src/lib/store");
+    expect(ownCoverPath(`${base}${uid}/back-1234.jpg`, uid)).toBe(`${uid}/back-1234.jpg`);
+    expect(ownCoverPath(`${base}${uid}/lb-disc-42.png?t=1`, uid)).toBe(`${uid}/lb-disc-42.png`);
+  });
+  it("refuse tout le reste", async () => {
+    const { ownCoverPath } = await import("../src/lib/store");
+    expect(ownCoverPath(`${base}autre-uid/back-1.jpg`, uid)).toBeNull();
+    expect(ownCoverPath(`${base}${uid}/../autre/x.jpg`, uid)).toBeNull();
+    expect(ownCoverPath(`${base}${uid}%2F..%2Fautre%2Fx.jpg`, uid)).toBeNull();
+    expect(ownCoverPath("https://images.igdb.com/igdb/image/upload/t_1080p/abc.jpg", uid)).toBeNull();
+    expect(ownCoverPath(null, uid)).toBeNull();
+  });
+});

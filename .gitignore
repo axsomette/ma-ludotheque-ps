@@ -11,3 +11,4 @@ security-reports/
 *.tsbuildinfo
 brand/renders/
 .claude/
+public/ocr/

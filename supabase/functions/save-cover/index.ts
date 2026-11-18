@@ -39,6 +39,13 @@ function publicKey(): string {
   return Deno.env.get("SUPABASE_ANON_KEY")!;
 }
 
+/** Quota d'appels par utilisateur (fonction SQL take_quota, limites fixées côté base). */
+async function underQuota(supabase: ReturnType<typeof createClient>, fn: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc("take_quota", { fn });
+  if (error) throw error; // quota illisible : on refuse (échec fermé)
+  return data === true;
+}
+
 const MAX_BYTES = 5 * 1024 * 1024;
 // Identifiant strict : on ne télécharge que depuis le CDN d'IGDB (pas de requête vers une URL arbitraire).
 const IMAGE_ID = /^[a-z0-9]{4,40}$/;
@@ -55,6 +62,9 @@ Deno.serve(async (req) => {
     const { data: auth, error: authError } = await supabase.auth.getUser();
     if (authError || !auth.user) return json(req, { error: "Non connecté" }, 401);
     const uid = auth.user.id;
+    if (!(await underQuota(supabase, "save-cover"))) {
+      return json(req, { error: "Trop d'ajouts pour l'instant. Réessaie dans une heure." }, 429);
+    }
 
     const { image_id, screenshot_ids } = await req.json();
     if (typeof image_id !== "string" || !IMAGE_ID.test(image_id)) {
@@ -65,7 +75,7 @@ Deno.serve(async (req) => {
       : [];
 
     async function copy(size: string, id: string, prefix: string): Promise<string> {
-      const img = await fetch(`https://images.igdb.com/igdb/image/upload/${size}/${id}.jpg`);
+      const img = await fetch(`https://images.igdb.com/igdb/image/upload/${size}/${id}.jpg`, { redirect: "error" });
       if (!img.ok) throw new Error(`Image IGDB introuvable (${img.status})`);
       const bytes = new Uint8Array(await img.arrayBuffer());
       if (bytes.byteLength > MAX_BYTES) throw new Error("Image trop lourde");
@@ -83,7 +93,7 @@ Deno.serve(async (req) => {
 
     return json(req, { url, screenshots });
   } catch (e) {
-    console.error(e);
-    return json(req, { error: (e as Error).message }, 500);
+    console.error(e); // le détail reste dans les journaux, jamais dans la réponse
+    return json(req, { error: "La jaquette n'a pas pu être enregistrée. Réessaie dans un instant." }, 500);
   }
 });

@@ -179,6 +179,9 @@ Vitest : couleurs et PEGI, textes du dos, détection de plateforme et nettoyage 
 - **RLS partout** : un utilisateur ne lit et n'écrit que ses jeux, et seulement dans `covers/<son id>/`.
 - **Fonctions fermées par défaut** : session vérifiée dans chaque fonction (401 sinon), téléchargements limités à des hôtes fixés (CDN IGDB, images LaunchBox) avec identifiants validés.
 - **Vie privée** : la photo de la jaquette est lue sur l'appareil ; les photos envoyées sont réencodées (métadonnées EXIF et GPS supprimées) et nommées au hasard.
+- **Quotas par compte** : 1 000 jeux, 4 000 fichiers, 60 appels par heure et par fonction (limites fixées côté base, `supabase/migrations/20261118000000_quotas.sql`).
+- **Content-Security-Policy** dans la version publiée, et OCR servi par le site lui-même (`scripts/copy-ocr.mjs`) : aucun script chargé depuis un CDN.
+- Fichiers supprimés du stockage avec le jeu ou quand une photo est reprise ; fonctions sans redirection suivie, messages d'erreur génériques.
 
 Une faille ? Merci de la signaler en privé via les [GitHub Security Advisories](https://github.com/axsomette/ma-ludotheque-ps/security/advisories/new) plutôt qu'en issue publique.
 

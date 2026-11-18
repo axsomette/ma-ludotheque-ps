@@ -52,10 +52,13 @@ async function igdbToken(): Promise<string> {
   const id = Deno.env.get("TWITCH_CLIENT_ID");
   const secret = Deno.env.get("TWITCH_CLIENT_SECRET");
   if (!id || !secret) throw new Error("TWITCH_CLIENT_ID / TWITCH_CLIENT_SECRET manquants");
-  const r = await fetch(
-    `https://id.twitch.tv/oauth2/token?client_id=${encodeURIComponent(id)}&client_secret=${encodeURIComponent(secret)}&grant_type=client_credentials`,
-    { method: "POST" },
-  );
+  // Identifiants dans le corps (jamais dans l'URL : une erreur réseau recopie l'URL dans son message).
+  const r = await fetch("https://id.twitch.tv/oauth2/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ client_id: id, client_secret: secret, grant_type: "client_credentials" }),
+    redirect: "error",
+  });
   if (!r.ok) throw new Error(`Twitch OAuth ${r.status}`);
   const j = await r.json();
   token = { value: j.access_token, expires: Date.now() + j.expires_in * 1000 };
@@ -72,9 +75,17 @@ async function igdb(body: string): Promise<any[]> {
       "Content-Type": "text/plain",
     },
     body,
+    redirect: "error",
   });
   if (!r.ok) throw new Error(`IGDB ${r.status} ${await r.text().catch(() => "")}`.trim());
   return await r.json();
+}
+
+/** Quota d'appels par utilisateur (fonction SQL take_quota, limites fixées côté base). */
+async function underQuota(supabase: ReturnType<typeof createClient>, fn: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc("take_quota", { fn });
+  if (error) throw error; // quota illisible : on refuse (échec fermé)
+  return data === true;
 }
 
 const PEGI_WORDS: Record<string, number> = { three: 3, seven: 7, twelve: 12, sixteen: 16, eighteen: 18 };
@@ -128,6 +139,9 @@ Deno.serve(async (req) => {
     });
     const { data: auth, error: authError } = await supabase.auth.getUser();
     if (authError || !auth.user) return json(req, { error: "Non connecté" }, 401);
+    if (!(await underQuota(supabase, "search-cover"))) {
+      return json(req, { error: "Trop de recherches pour l'instant. Réessaie dans une heure." }, 429);
+    }
 
     const { query, platform } = await req.json();
     const q = String(query ?? "")
@@ -135,7 +149,7 @@ Deno.serve(async (req) => {
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 80);
-    const pid = IGDB_PLATFORM[String(platform)];
+    const pid = Object.hasOwn(IGDB_PLATFORM, String(platform)) ? IGDB_PLATFORM[String(platform)] : undefined;
     if (!q || !pid) return json(req, { error: "query et platform (ps3|ps4|ps5) requis" }, 400);
 
     const fields =
@@ -165,7 +179,7 @@ Deno.serve(async (req) => {
     }));
     return json(req, { results });
   } catch (e) {
-    console.error(e);
-    return json(req, { error: (e as Error).message }, 502);
+    console.error(e); // le détail reste dans les journaux, jamais dans la réponse
+    return json(req, { error: "La recherche de jaquettes est indisponible pour le moment. Réessaie dans un instant." }, 502);
   }
 });

@@ -40,7 +40,14 @@ export function cleanTitle(raw: string): string {
  */
 export async function readCover(file: Blob, onProgress?: (p: number) => void): Promise<OcrResult> {
   const { createWorker } = await import("tesseract.js");
+  // Tout est servi par le site lui-même (public/ocr/, copié par scripts/copy-ocr.mjs) : aucun code
+  // n'est chargé depuis un CDN, ce qui permet aussi une CSP stricte.
+  const ocr = (p: string) => new URL(`${import.meta.env.BASE_URL}ocr/${p}`, window.location.href).href;
   const worker = await createWorker(["eng", "fra"], 1, {
+    workerPath: ocr("worker.min.js"),
+    workerBlobURL: false,
+    corePath: ocr("core"),
+    langPath: ocr("lang"),
     logger: (m: { status: string; progress: number }) => {
       if (m.status === "recognizing text") onProgress?.(m.progress);
     },

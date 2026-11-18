@@ -7,7 +7,7 @@ import { coverSrc } from "./Library";
 import { fetchDetails, fetchScans, needsDetails, ScansUnavailable, uploadPhoto, type PhotoKind } from "../lib/covers";
 import { isDemo } from "../lib/supabase";
 import { PLATFORMS } from "../lib/platforms";
-import { updateGame } from "../lib/store";
+import { pruneFiles, updateGame } from "../lib/store";
 import type { Game } from "../lib/types";
 import { GameCase3D, type CaseMode } from "./GameCase3D";
 import { DiscSpinner } from "./Logo";
@@ -94,8 +94,10 @@ export function Viewer({ game, initialMode = "front", onClose, onDelete, onUpdat
     setError(null);
     try {
       const url = await uploadPhoto(file, kind);
+      const previous = kind === "back" ? game.back_url : game.disc_url;
       const updated = await updateGame(game.id, kind === "back" ? { back_url: url } : { disc_url: url });
       onUpdate(updated);
+      void pruneFiles([previous]); // l'ancienne photo ne doit pas rester publique
       changeMode(kind === "back" ? "back" : "disc");
     } catch (e) {
       setError((e as Error).message);

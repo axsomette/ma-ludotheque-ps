@@ -5,7 +5,9 @@
   "type": "module",
   "description": "Bibliothèque de jeux PlayStation physiques : photo du jeu, jaquette trouvée automatiquement, boîtier 3D qui s'ouvre.",
   "scripts": {
+    "predev": "node scripts/copy-ocr.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/copy-ocr.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b",
@@ -21,6 +23,8 @@
     "three": "^0.187.0"
   },
   "devDependencies": {
+    "@tesseract.js-data/eng": "1.0.0",
+    "@tesseract.js-data/fra": "1.0.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@types/three": "^0.187.0",
