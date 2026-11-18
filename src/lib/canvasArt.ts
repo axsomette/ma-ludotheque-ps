@@ -1,6 +1,7 @@
 // Visuels générés en canvas : jaquette avant, tranche, dos, sérigraphie et face gravée du disque.
 // Mise en page des boîtiers européens (PAL) PS5, PS4 et PS3, relevée sur de vrais boîtiers.
-// Aucun logo déposé n'est reproduit : « PS5 », « PS4 », « PS3 » sont écrits en toutes lettres.
+// Bandeaux : logotypes officiels PS5 / PS4 / PS3 (versions du domaine public de Wikimedia Commons,
+// public/brand/consoles/), seuls le visuel et les infos du jeu changent d'une jaquette à l'autre.
 import { mix, pegiColor, wrapText } from "./artUtils";
 import { PLATFORMS } from "./platforms";
 import type { Game, Platform } from "./types";
@@ -20,8 +21,30 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-/** Attend que les polices de l'interface soient prêtes (sinon le canvas dessine en police système). */
+// Logotypes officiels des bandeaux : PS5 noir, PS4 et PS3 blancs (teintés au besoin).
+const WORDMARK_SRC: Record<Platform, string> = {
+  ps5: `${import.meta.env.BASE_URL}brand/consoles/ps5-wordmark.png`,
+  ps4: `${import.meta.env.BASE_URL}brand/consoles/ps4-wordmark.png`,
+  ps3: `${import.meta.env.BASE_URL}brand/consoles/ps3-wordmark.png`,
+};
+const wordmarkImg: Partial<Record<Platform, HTMLImageElement>> = {};
+let wordmarksLoading: Promise<void> | null = null;
+
+function wordmarksReady(): Promise<void> {
+  if (typeof document === "undefined") return Promise.resolve();
+  wordmarksLoading ??= Promise.all(
+    (Object.keys(WORDMARK_SRC) as Platform[]).map((p) =>
+      loadImage(WORDMARK_SRC[p])
+        .then((img) => void (wordmarkImg[p] = img))
+        .catch(() => undefined), // logo absent : le texte de secours prend le relais
+    ),
+  ).then(() => undefined);
+  return wordmarksLoading;
+}
+
+/** Attend que les polices et les logotypes soient prêts (sinon le canvas dessine en police système). */
 export async function fontsReady(): Promise<void> {
+  await wordmarksReady();
   try {
     await Promise.all([
       document.fonts.load(`700 48px ${DISPLAY}`),
@@ -57,16 +80,49 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 /** Part de la hauteur occupée par le bandeau de plateforme sur une jaquette européenne. */
 const BAND = 0.105;
 
-/** Mot-symbole de plateforme : lettres larges et espacées, comme sur les bandeaux. */
-function drawWordmark(ctx: CanvasRenderingContext2D, label: string, x: number, y: number, size: number, ink: string, align: CanvasTextAlign = "left") {
-  ctx.save();
-  ctx.fillStyle = ink;
-  ctx.textAlign = align;
-  ctx.textBaseline = "middle";
-  ctx.font = `600 ${size}px ${DISPLAY}`;
-  ctx.letterSpacing = `${size * 0.16}px`;
-  ctx.fillText(label, x, y);
-  ctx.restore();
+/**
+ * Logotype officiel de la plateforme, hauteur `height`, centré verticalement sur y.
+ * `ink` recolore le logo (« silver » : dégradé argenté du PS3) ; sans logo chargé, le nom est écrit en secours.
+ */
+function drawWordmark(
+  ctx: CanvasRenderingContext2D,
+  platform: Platform,
+  x: number,
+  y: number,
+  height: number,
+  ink: string,
+  align: "left" | "center" = "left",
+) {
+  const img = wordmarkImg[platform];
+  if (!img) {
+    ctx.save();
+    ctx.fillStyle = ink === "silver" ? "#d8dbe2" : ink;
+    ctx.textAlign = align;
+    ctx.textBaseline = "middle";
+    ctx.font = `600 ${height * 1.25}px ${DISPLAY}`;
+    ctx.letterSpacing = `${height * 0.2}px`;
+    ctx.fillText(PLATFORMS[platform].label, x, y);
+    ctx.restore();
+    return;
+  }
+  const w = (img.width / img.height) * height;
+  const left = align === "center" ? x - w / 2 : x;
+  // recoloration : logo dessiné seul, puis la couleur appliquée « dans » sa forme
+  const off = document.createElement("canvas");
+  off.width = Math.ceil(w);
+  off.height = Math.ceil(height);
+  const o = off.getContext("2d")!;
+  o.drawImage(img, 0, 0, w, height);
+  o.globalCompositeOperation = "source-in";
+  if (ink !== "silver") o.fillStyle = ink;
+  else {
+    const g = o.createLinearGradient(0, 0, 0, height);
+    g.addColorStop(0, "#f6f7fa");
+    g.addColorStop(1, "#9ea3ae");
+    o.fillStyle = g;
+  }
+  o.fillRect(0, 0, off.width, off.height);
+  ctx.drawImage(off, left, y - height / 2);
 }
 
 /**
@@ -78,7 +134,7 @@ function drawBand(ctx: CanvasRenderingContext2D, platform: Platform, w: number, 
   if (platform === "ps5") {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, w, h);
-    drawWordmark(ctx, "PS5", h * 0.55, h * 0.52, h * 0.46, "#000000");
+    drawWordmark(ctx, "ps5", h * 0.5, h * 0.5, h * 0.4, "#000000");
     return;
   }
   if (platform === "ps4") {
@@ -88,7 +144,7 @@ function drawBand(ctx: CanvasRenderingContext2D, platform: Platform, w: number, 
     g.addColorStop(1, "#00246a");
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, w, h);
-    drawWordmark(ctx, "PS4", h * 0.55, h * 0.52, h * 0.46, "#ffffff");
+    drawWordmark(ctx, "ps4", h * 0.5, h * 0.5, h * 0.4, "#ffffff");
     return;
   }
   const g = ctx.createLinearGradient(0, 0, 0, h);
@@ -97,16 +153,8 @@ function drawBand(ctx: CanvasRenderingContext2D, platform: Platform, w: number, 
   g.addColorStop(1, "#000000");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
-  const silver = ctx.createLinearGradient(0, h * 0.25, 0, h * 0.8);
-  silver.addColorStop(0, "#f4f5f8");
-  silver.addColorStop(1, "#9ea3ae");
-  ctx.save();
-  ctx.fillStyle = silver;
-  ctx.textBaseline = "middle";
-  ctx.font = `600 ${h * 0.46}px ${DISPLAY}`;
-  ctx.letterSpacing = `${h * 0.07}px`;
-  ctx.fillText("PS3", h * 0.55, h * 0.52);
-  ctx.restore();
+  // « PS3 » argenté (dégradé appliqué dans le logo)
+  drawWordmark(ctx, "ps3", h * 0.5, h * 0.5, h * 0.34, "silver");
   ctx.save();
   ctx.fillStyle = "#e4e6ec";
   ctx.textAlign = "right";
@@ -238,8 +286,9 @@ function hasBand(img: Img, platform: Platform): boolean {
 }
 
 /**
- * Face avant : la jaquette IGDB telle quelle si elle porte déjà son bandeau ;
- * sinon composée comme un boîtier européen : bandeau, illustration, PEGI, pastille, éditeur.
+ * Face avant : toujours le bandeau officiel de la plateforme, seul le visuel du jeu change.
+ * Jaquette importée avec son propre bandeau : on le coupe et on garde l'illustration (avec ses
+ * mentions d'origine en pied). Illustration seule : on compose tout le pied européen (PEGI, pastille, éditeur).
  */
 export async function frontCover(game: Game): Promise<HTMLCanvasElement> {
   const W = 1080, H = 1368;
@@ -253,11 +302,17 @@ export async function frontCover(game: Game): Promise<HTMLCanvasElement> {
   } catch {
     img = null;
   }
+  const bh = Math.round(H * BAND);
   if (img && hasBand(img, game.platform)) {
-    drawCover(ctx, img, 0, 0, W, H);
+    const cut = Math.round(img.height * BAND);
+    const art = document.createElement("canvas");
+    art.width = img.width;
+    art.height = img.height - cut;
+    art.getContext("2d")!.drawImage(img, 0, cut, img.width, img.height - cut, 0, 0, img.width, img.height - cut);
+    drawCover(ctx, art, 0, bh, W, H - bh);
+    drawBand(ctx, game.platform, W, bh);
     return c;
   }
-  const bh = Math.round(H * BAND);
   if (img) drawCover(ctx, img, 0, bh, W, H - bh);
   else {
     ctx.fillStyle = "#2a3150";
@@ -315,7 +370,7 @@ export function spineTexture(game: Game, base: string): HTMLCanvasElement {
   ctx.save();
   ctx.translate(W / 2, top / 2);
   ctx.rotate(Math.PI / 2);
-  drawWordmark(ctx, PLATFORMS[game.platform].label, 0, 0, 34, game.platform === "ps5" ? "#000000" : "#e9ebf0", "center");
+  drawWordmark(ctx, game.platform, 0, 0, 26, game.platform === "ps5" ? "#000000" : "#e9ebf0", "center");
   ctx.restore();
   ctx.save();
   ctx.translate(W / 2 + 14, top + 34);
@@ -598,7 +653,7 @@ export async function discLabel(game: Game): Promise<HTMLCanvasElement> {
     ctx.fillRect(0, top - 3, S, 3);
   }
   const ink = game.platform === "ps5" ? "#000000" : "#eef0f5";
-  drawWordmark(ctx, PLATFORMS[game.platform].label, R, top + 64, 54, ink, "center");
+  drawWordmark(ctx, game.platform, R, top + 64, 40, ink, "center");
   ctx.fillStyle = game.platform === "ps5" ? "rgba(0,0,0,.4)" : "rgba(255,255,255,.4)";
   ctx.fillRect(R - 200, top + 118, 400, 4);
   ctx.fillRect(R - 150, top + 132, 300, 4);

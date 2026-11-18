@@ -40,6 +40,8 @@ Vitest : calculs de couleurs et PEGI, découpe des textes du dos, détection de 
 |---|---|
 | `src/` | Appli React + Vite, publiée sur GitHub Pages |
 | `src/components/GameCase3D.tsx` | Boîtier 3D (Three.js / React Three Fiber) : couvercle à charnière, disque irisé |
+| `public/models/case.glb` | Coque du boîtier Blu-ray (deux demi-coques, tranche à double charnière, moyeu, attaches à livret), modélisée par `blender/build_case.py` ; textures de plastique faites dans TextureLucraft (`blender/tex/`). Regénérer : `Blender -b -P blender/build_case.py -- <dossier>` puis copier `case.glb` |
+| `public/brand/consoles/` | Logotypes officiels PS5 / PS4 / PS3 des bandeaux (versions du domaine public, Wikimedia Commons). Le bandeau est toujours celui-là : seul le visuel du jeu change |
 | `src/components/Library.tsx` | Accueil : jeu mis en avant, rangées et grille de boîtiers (CSS, sans Three.js) |
 | `src/lib/ocr.ts` | Lecture du titre (Tesseract.js), **dans le navigateur** : la photo n'est envoyée nulle part |
 | `supabase/migrations/` | Table `games`, règles RLS (chacun ne voit que ses jeux), bucket `covers` |

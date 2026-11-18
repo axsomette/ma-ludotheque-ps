@@ -18,8 +18,8 @@ interface PlatformStyle {
 // Boîtiers européens (PAL), relevés sur de vrais boîtiers ; aucun logo ni marque déposée n'est reproduit.
 export const PLATFORMS: Record<Platform, PlatformStyle> = {
   ps3: { label: "PS3", caseColor: "#121316", caseInner: "#131418", translucency: 0, bandColor: "#0b0b0d", bandText: "#e4e6ec", accent: "#a6adbb" },
-  ps4: { label: "PS4", caseColor: "#0d3fa6", caseInner: "#24509f", translucency: 0, bandColor: "#0b4fc2", bandText: "#ffffff", accent: "#3d7bff" },
-  ps5: { label: "PS5", caseColor: "#2a63d6", caseInner: "#2f5fc4", translucency: 0.35, bandColor: "#ffffff", bandText: "#000000", accent: "#e8ecf5" },
+  ps4: { label: "PS4", caseColor: "#0d3fa6", caseInner: "#24509f", translucency: 0.25, bandColor: "#0b4fc2", bandText: "#ffffff", accent: "#3d7bff" },
+  ps5: { label: "PS5", caseColor: "#2a63d6", caseInner: "#2f5fc4", translucency: 0.6, bandColor: "#ffffff", bandText: "#000000", accent: "#e8ecf5" },
 };
 
 export const PLATFORM_ORDER: Platform[] = ["ps5", "ps4", "ps3"];
