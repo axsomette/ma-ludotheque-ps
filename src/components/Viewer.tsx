@@ -4,11 +4,12 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { metaLine, mix } from "../lib/artUtils";
 import { dominantColor } from "../lib/canvasArt";
 import { coverSrc } from "./Library";
-import { uploadPhoto, type PhotoKind } from "../lib/covers";
+import { fetchDetails, needsDetails, uploadPhoto, type PhotoKind } from "../lib/covers";
 import { PLATFORMS } from "../lib/platforms";
 import { updateGame } from "../lib/store";
 import type { Game } from "../lib/types";
 import { GameCase3D, type CaseMode } from "./GameCase3D";
+import { DiscSpinner } from "./Logo";
 import { IconBack, IconCamera, IconCase, IconDisc, IconFlip, IconOpen, IconTrash } from "./icons";
 
 interface Props {
@@ -48,7 +49,7 @@ export function Viewer({ game, initialMode = "front", onClose, onDelete, onUpdat
   const [mode, setMode] = useState<CaseMode>(initialMode);
   const [flipped, setFlipped] = useState(false);
   const [tint, setTint] = useState("#2a3558");
-  const [busy, setBusy] = useState<PhotoKind | "delete" | null>(null);
+  const [busy, setBusy] = useState<PhotoKind | "delete" | "details" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [moreSummary, setMoreSummary] = useState(false);
   const backInput = useRef<HTMLInputElement>(null);
@@ -94,6 +95,23 @@ export function Viewer({ game, initialMode = "front", onClose, onDelete, onUpdat
       const updated = await updateGame(game.id, kind === "back" ? { back_url: url } : { disc_url: url });
       onUpdate(updated);
       changeMode(kind === "back" ? "back" : "disc");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function completeDetails() {
+    setBusy("details");
+    setError(null);
+    try {
+      const patch = await fetchDetails(game);
+      if (!patch) {
+        setError(`« ${game.title} » n'a pas été retrouvé sur IGDB. Les infos restent telles quelles.`);
+        return;
+      }
+      onUpdate(await updateGame(game.id, patch));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -165,6 +183,15 @@ export function Viewer({ game, initialMode = "front", onClose, onDelete, onUpdat
           {game.title}
         </h2>
         <p className="hero-meta mono">{metaLine([game.release_year, game.pegi ? `PEGI ${game.pegi}` : null, game.publisher])}</p>
+        {needsDetails(game) && (
+          <div className="details-gap">
+            <p className="muted small">Résumé, éditeur, genres ou captures manquent : ce jeu a été rangé avant leur ajout.</p>
+            <button className="btn" onClick={completeDetails} disabled={busy !== null}>
+              {busy === "details" ? <DiscSpinner size={20} /> : <IconFlip />}
+              {busy === "details" ? "Recherche sur IGDB…" : "Compléter les infos"}
+            </button>
+          </div>
+        )}
         {game.genres.length > 0 && (
           <ul className="genres" aria-label="Genres">
             {game.genres.map((g) => (

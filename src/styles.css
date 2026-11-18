@@ -281,6 +281,8 @@ input::placeholder { color: #6c7590; }
 .genres li { padding: 4px 10px; border-radius: 4px; background: var(--deck-2); font-size: 14px; color: #c9cfdf; }
 .summary p { color: #c9cfdf; font-size: 16px; line-height: 1.6; }
 .summary p.clamped { display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
+.details-gap { display: grid; gap: 10px; padding: 14px 16px; border-radius: var(--r); border: 1px dashed var(--wire); }
+.details-gap .btn { justify-self: start; }
 .photos { display: grid; gap: 10px; padding: 16px; border-radius: var(--r); background: rgba(14, 18, 32, 0.8); border: 1px solid var(--wire); }
 .photos h3 { font: 600 15px/1.2 var(--display); letter-spacing: 0.06em; text-transform: uppercase; }
 .photo-actions { display: grid; gap: 8px; }

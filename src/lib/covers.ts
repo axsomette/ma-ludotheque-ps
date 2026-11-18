@@ -1,6 +1,6 @@
 import { generatedCover } from "./canvasArt";
 import { supabase } from "./supabase";
-import type { CoverCandidate, Platform } from "./types";
+import type { CoverCandidate, Game, GamePatch, Platform } from "./types";
 
 /**
  * Cherche des jeux correspondant au titre lu sur la photo.
@@ -44,6 +44,42 @@ export async function saveCover(c: CoverCandidate, platform: Platform): Promise<
   });
   if (error || !data?.url) throw new Error("La jaquette n'a pas pu être enregistrée. Réessaie dans un instant.");
   return { url: data.url, screenshots: data.screenshots ?? [] };
+}
+
+/** Un jeu rangé avant l'ajout des détails (ou dont la fiche IGDB était incomplète à l'époque). */
+export function needsDetails(g: Pick<Game, "igdb_id" | "summary" | "publisher" | "genres" | "pegi" | "screenshots">): boolean {
+  return g.igdb_id != null && (!g.summary || !g.publisher || g.genres.length === 0 || g.pegi == null || g.screenshots.length === 0);
+}
+
+/** Retrouve le même jeu dans les résultats : par identifiant IGDB, sinon par titre exact. */
+export function pickSameGame(results: CoverCandidate[], igdbId: number | null, title: string): CoverCandidate | null {
+  if (igdbId != null) {
+    const byId = results.find((c) => c.igdb_id === igdbId);
+    if (byId) return byId;
+  }
+  const t = title.trim().toLowerCase();
+  return results.find((c) => c.name.trim().toLowerCase() === t) ?? null;
+}
+
+/**
+ * Va rechercher sur IGDB les détails manquants d'un jeu déjà rangé (résumé, éditeur, genres, PEGI, captures).
+ * Ce qui existe déjà n'est jamais écrasé par un vide. Renvoie null si le jeu n'est pas retrouvé.
+ */
+export async function fetchDetails(game: Game): Promise<GamePatch | null> {
+  const c = pickSameGame(await searchCovers(game.title, game.platform), game.igdb_id, game.title);
+  if (!c) return null;
+  let screenshots = game.screenshots;
+  if (screenshots.length === 0 && c.screenshot_ids.length > 0 && c.image_id) {
+    screenshots = (await saveCover(c, game.platform)).screenshots;
+  }
+  return {
+    summary: game.summary ?? c.summary,
+    publisher: game.publisher ?? c.publisher,
+    genres: game.genres.length > 0 ? game.genres : c.genres,
+    pegi: game.pegi ?? c.pegi,
+    release_year: game.release_year ?? c.year,
+    screenshots,
+  };
 }
 
 export type PhotoKind = "front" | "back" | "disc";

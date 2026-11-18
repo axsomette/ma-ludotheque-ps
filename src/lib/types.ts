@@ -24,7 +24,9 @@ export interface Game {
 }
 
 export type NewGame = Omit<Game, "id" | "created_at">;
-export type GamePatch = Partial<Pick<Game, "back_url" | "disc_url" | "title">>;
+export type GamePatch = Partial<
+  Pick<Game, "back_url" | "disc_url" | "title" | "summary" | "publisher" | "genres" | "pegi" | "screenshots" | "release_year">
+>;
 
 /** Un résultat de recherche de jaquette. */
 export interface CoverCandidate {
