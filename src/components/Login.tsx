@@ -75,6 +75,7 @@ export function Login() {
             </button>
           </form>
         )}
+        <p className="muted small">Première fois ? Ton compte se crée à la première connexion, sans mot de passe.</p>
         {error && (
           <p className="error" role="alert">
             {error}
