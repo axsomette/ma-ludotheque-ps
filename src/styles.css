@@ -341,6 +341,13 @@ input::placeholder { color: #6c7590; }
 .sep { display: flex; align-items: center; gap: 12px; width: 100%; font-size: 14px; color: var(--muted); }
 .sep::before, .sep::after { content: ""; flex: 1; height: 1px; background: var(--wire); }
 .email-row { display: grid; gap: 10px; width: 100%; text-align: left; }
+.login-card .segmented { width: 100%; }
+.login-card .segmented button { flex: 1; justify-content: center; }
+.login-title { margin: 0; font: 700 20px/1.2 var(--display); text-transform: uppercase; letter-spacing: 0.04em; }
+.login-card .hint { margin: -4px 0 0; }
+.password { position: relative; display: block; }
+.password input { padding-right: 52px; }
+.password .icon-btn { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); }
 
 /* ---------- Petits écrans ---------- */
 @media (max-width: 899px) {

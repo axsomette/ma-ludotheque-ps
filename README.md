@@ -6,7 +6,7 @@ Ma collection de jeux PlayStation **physiques** (PS3, PS4, PS5), en boîtiers 3D
 2. Le titre est lu directement dans le navigateur, et la plateforme est devinée grâce au bandeau PS5, PS4 ou PS3.
 3. La jaquette officielle est retrouvée sur [IGDB](https://www.igdb.com/).
 4. Le jeu arrive sur l'**accueil**, comme sur une console : le jeu sélectionné en grand (le fond prend la couleur de sa jaquette), puis des rangées par plateforme.
-5. Tout est enregistré dans Supabase, par utilisateur (connexion GitHub ou lien par e-mail).
+5. Tout est enregistré dans Supabase, par utilisateur (compte e-mail + mot de passe, créé depuis l'onglet « Inscription »).
 
 Sans configuration, l'appli démarre en **mode démo** : la collection reste dans le navigateur, et les jaquettes sont générées.
 
@@ -61,9 +61,10 @@ Vitest : calculs de couleurs et PEGI, découpe des textes du dos, détection de 
    ```bash
    supabase db push
    ```
-3. **Connexion GitHub** :
-   - Authentication → Providers → GitHub : coller le Client ID et le Client Secret d'une OAuth App GitHub.
-   - Cette OAuth App se crée dans GitHub → Settings → Developer settings → OAuth Apps. Son « callback URL » est `https://<ref>.supabase.co/auth/v1/callback`.
+3. **Comptes e-mail + mot de passe** (Authentication → Sign In / Providers) :
+   - Email activé, « Allow new users to sign up » activé.
+   - « Confirm email » : sans serveur SMTP personnalisé, Supabase n'envoie d'e-mails qu'aux membres de l'organisation (quelques-uns par heure). Pour que d'autres personnes puissent s'inscrire : soit désactiver « Confirm email » (compte actif tout de suite), soit brancher un SMTP (Authentication → Emails → SMTP Settings).
+   - « Mot de passe oublié » envoie un lien de réinitialisation : même contrainte d'envoi.
 4. Authentication → URL Configuration :
    - **Site URL** : `https://<compte>.github.io/ma-ludotheque-ps/`
    - **Redirect URLs** : la même adresse, plus `http://localhost:5173/` pour le développement.

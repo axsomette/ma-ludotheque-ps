@@ -54,6 +54,7 @@ export default function App() {
   const [viewing, setViewing] = useState<{ game: Game; mode: CaseMode } | null>(null);
   // Jeu mis en avant sur l'accueil : celui qu'on survole, qu'on parcourt au clavier ou qu'on a ouvert en dernier.
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [recovery, setRecovery] = useState(false);
 
   useEffect(() => {
     if (!supabase) return;
@@ -61,7 +62,11 @@ export default function App() {
       setSession(data.session);
       setAuthReady(true);
     });
-    const { data } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    const { data } = supabase.auth.onAuthStateChange((event, s) => {
+      setSession(s);
+      // retour depuis le lien « mot de passe oublié » : on demande le nouveau mot de passe
+      if (event === "PASSWORD_RECOVERY") setRecovery(true);
+    });
     return () => data.subscription.unsubscribe();
   }, []);
 
@@ -119,6 +124,7 @@ export default function App() {
         <DiscSpinner size={44} />
       </div>
     );
+  if (recovery) return <Login recovery onRecovered={() => setRecovery(false)} />;
   if (!signedIn) return <Login />;
 
   return (
