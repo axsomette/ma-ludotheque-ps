@@ -1,0 +1,27 @@
+name: Bons plans
+
+# Chaque heure, la fonction sync-deals relit les flux RSS publics de Dealabs (jeux PS5 / PS4)
+# et enregistre les nouveaux bons plans (boutique, prix, date) : l'historique des prix se remplit tout seul.
+
+on:
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Collecte
+        env:
+          SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          SUPABASE_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          code=$(curl -sS -o /tmp/r.json -w "%{http_code}" -X POST --retry 2 \
+            -H "apikey: $SUPABASE_KEY" -H "Content-Type: application/json" -d '{}' \
+            "$SUPABASE_URL/functions/v1/sync-deals")
+          cat /tmp/r.json; echo
+          [ "$code" -ge 200 ] && [ "$code" -lt 300 ]

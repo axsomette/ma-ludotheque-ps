@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { findDeals, type StoreDeal } from "../lib/deals";
+import { since } from "../lib/loans";
 import { euros, fetchMarket, MarketNotConfigured, priceChartingUrl, type Estimate, type MarketResult } from "../lib/market";
 import { PLATFORMS } from "../lib/platforms";
 import type { CoverCandidate, Edition, Game, Platform } from "../lib/types";
@@ -39,6 +41,8 @@ export function BuySheet({ candidate, platform, owned, onOpenOwned, onClose }: P
   const [busy, setBusy] = useState(true);
   const [note, setNote] = useState<string | null>(null);
   const dialog = useRef<HTMLDivElement>(null);
+  const [deals, setDeals] = useState<StoreDeal[] | null>(null);
+  const [dealsError, setDealsError] = useState<string | null>(null);
   const game = { title: candidate.name, platform };
 
   useEffect(() => {
@@ -54,6 +58,19 @@ export function BuySheet({ candidate, platform, owned, onOpenOwned, onClose }: P
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candidate.igdb_id, candidate.name, platform, edition]);
+
+  // Prix repérés boutique par boutique (bons plans Dealabs), indépendants d'eBay.
+  useEffect(() => {
+    let live = true;
+    setDeals(null);
+    setDealsError(null);
+    findDeals(candidate.name, platform, edition)
+      .then((d) => live && setDeals(d))
+      .catch((e) => live && setDealsError((e as Error).message));
+    return () => {
+      live = false;
+    };
+  }, [candidate.name, platform, edition]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -84,6 +101,36 @@ export function BuySheet({ candidate, platform, owned, onOpenOwned, onClose }: P
             )}
           </div>
         </div>
+
+        <section className="photos market" aria-labelledby="buy-deals-title">
+          <h3 id="buy-deals-title">Prix par boutique</h3>
+          {deals === null && !dealsError ? (
+            <p className="value-line muted" role="status">
+              <DiscSpinner size={18} /> Recherche des prix…
+            </p>
+          ) : dealsError ? (
+            <p className="muted small">{dealsError}</p>
+          ) : deals!.length === 0 ? (
+            <p className="muted small">Aucun prix repéré pour ce jeu ces 90 derniers jours. Les prix se remplissent automatiquement chaque heure : reviens plus tard, ou compare avec les boutiques plus bas.</p>
+          ) : (
+            <>
+              <ul className="deal-list">
+                {deals!.map((d, i) => (
+                  <li key={d.id}>
+                    <a href={d.link} target="_blank" rel="noopener noreferrer" className={`deal ${i === 0 ? "is-best" : ""}`}>
+                      <span className="deal-merchant">{d.merchant ?? "Boutique"}</span>
+                      <span className="deal-price mono">{d.price === 0 ? "Gratuit" : euros(d.price, 2)}</span>
+                      <span className="deal-meta muted small">
+                        {i === 0 ? "Meilleur prix · " : ""}repéré {since(d.published_at.slice(0, 10))}
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+              <p className="muted small">Prix repérés sur Dealabs (bons plans de la communauté) : une promo peut avoir pris fin, vérifie sur le site.</p>
+            </>
+          )}
+        </section>
 
         <section className="photos market" aria-labelledby="buy-price-title">
           <h3 id="buy-price-title">Cote du moment</h3>

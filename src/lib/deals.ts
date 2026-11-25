@@ -1,0 +1,47 @@
+import { matches, type Edition } from "../../supabase/functions/market-price/market";
+import { supabase } from "./supabase";
+import type { Platform } from "./types";
+
+export interface StoreDeal {
+  id: string;
+  title: string;
+  merchant: string | null;
+  price: number;
+  link: string;
+  published_at: string;
+}
+
+const LABEL: Record<Platform, string> = { ps3: "PS3", ps4: "PS4", ps5: "PS5" };
+const DAYS = 90;
+
+/**
+ * Meilleur prix repéré par boutique pour ce jeu (bons plans Dealabs des 90 derniers jours),
+ * du moins cher au plus cher. Relance d'abord la collecte (au plus une fois par quart d'heure côté serveur).
+ */
+export async function findDeals(title: string, platform: Platform, edition: Edition = "standard"): Promise<StoreDeal[]> {
+  if (!supabase) return [];
+  await supabase.functions.invoke("sync-deals", { body: {} }).catch(() => undefined);
+  const since = new Date(Date.now() - DAYS * 86_400_000).toISOString();
+  const { data, error } = await supabase
+    .from("deals")
+    .select("id,title,merchant,price,link,published_at")
+    .eq("platform", platform)
+    .gte("published_at", since)
+    .not("price", "is", null)
+    .order("published_at", { ascending: false })
+    .limit(2000);
+  if (error) throw new Error("Les bons plans n'ont pas pu être chargés.");
+  return bestByMerchant((data ?? []) as StoreDeal[], title, platform, edition);
+}
+
+/** Bons plans du jeu (titre, plateforme, édition), le moins cher par boutique, triés par prix. */
+export function bestByMerchant(rows: StoreDeal[], title: string, platform: Platform, edition: Edition): StoreDeal[] {
+  const best = new Map<string, StoreDeal>();
+  for (const r of rows) {
+    if (!matches({ title: `${r.title} ${LABEL[platform]}` }, title, platform, edition)) continue;
+    const key = (r.merchant ?? "Autre").toLowerCase();
+    const cur = best.get(key);
+    if (!cur || Number(r.price) < Number(cur.price)) best.set(key, { ...r, price: Number(r.price) });
+  }
+  return [...best.values()].sort((a, b) => a.price - b.price);
+}

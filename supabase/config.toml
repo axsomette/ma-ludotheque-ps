@@ -15,3 +15,6 @@ verify_jwt = false
 
 [functions.market-price]
 verify_jwt = false
+
+[functions.sync-deals]
+verify_jwt = false
