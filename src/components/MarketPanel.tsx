@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CONDITIONS, conditionOf, euros, fetchMarket, MarketNotConfigured, parseEuros, priceChartingUrl, storeLinks, valuePatch, type MarketResult, type Offer } from "../lib/market";
+import { CONDITIONS, conditionOf, euros, fetchMarket, MarketNotConfigured, parseEuros, priceChartingUrl, valuePatch, type MarketResult } from "../lib/market";
 import { since } from "../lib/loans";
 import { updateGame } from "../lib/store";
 import { isDemo } from "../lib/supabase";
@@ -14,22 +14,7 @@ interface Props {
 const WEEK = 7 * 86_400_000;
 const CONFIDENCE = { high: "fiable", medium: "indicative", low: "à prendre avec prudence" } as const;
 
-function OfferRow({ o }: { o: Offer }) {
-  return (
-    <li>
-      <a href={o.url} target="_blank" rel="noopener noreferrer" className="offer">
-        <span className="offer-price mono">{euros(o.price, 2)}</span>
-        <span className="offer-ship muted small">{o.shipping == null ? "port à voir" : o.shipping === 0 ? "port offert" : `+ ${euros(o.shipping, 2)} de port`}</span>
-        <span className="offer-title small">{o.title}</span>
-        <span className="offer-seller muted small">
-          {o.seller ?? "vendeur"} {o.feedback != null ? `· ${o.feedback.toLocaleString("fr-FR")} % d'avis positifs` : ""}
-        </span>
-      </a>
-    </li>
-  );
-}
-
-/** Cote du jeu (eBay France) selon son état et son édition, et où l'acheter moins cher. */
+/** Cote du jeu (eBay France) selon son état et son édition, et prix personnels. */
 export function MarketPanel({ game, onUpdate }: Props) {
   const [result, setResult] = useState<MarketResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -98,7 +83,6 @@ export function MarketPanel({ game, onUpdate }: Props) {
 
   const cond = conditionOf(game);
   const showEdition = game.edition === "collector" || result?.collector_exists;
-  const links = storeLinks(game);
 
   return (
     <>
@@ -199,38 +183,6 @@ export function MarketPanel({ game, onUpdate }: Props) {
         </form>
       </section>
 
-      <section className="photos market" aria-labelledby="buy-title">
-        <h3 id="buy-title">Acheter moins cher</h3>
-        {result && (result.offers.new.length > 0 || result.offers.used.length > 0) ? (
-          <>
-            {result.offers.new.length > 0 && (
-              <>
-                <p className="small offer-head">Neuf · vendeurs eBay bien notés</p>
-                <ul className="offers">{result.offers.new.map((o) => <OfferRow key={o.url} o={o} />)}</ul>
-              </>
-            )}
-            {result.offers.used.length > 0 && (
-              <>
-                <p className="small offer-head">Occasion · vendeurs eBay bien notés</p>
-                <ul className="offers">{result.offers.used.map((o) => <OfferRow key={o.url} o={o} />)}</ul>
-              </>
-            )}
-          </>
-        ) : result ? (
-          <p className="muted small">Aucune offre de vendeur bien noté sur eBay France pour l'instant.</p>
-        ) : null}
-        <p className="muted small">Comparer dans les boutiques françaises reconnues :</p>
-        <ul className="stores">
-          {links.map((l) => (
-            <li key={l.name}>
-              <a href={l.url} target="_blank" rel="noopener noreferrer">
-                <strong>{l.name}</strong>
-                <span className="muted small">{l.kind}</span>
-              </a>
-            </li>
-          ))}
-        </ul>
-      </section>
     </>
   );
 }

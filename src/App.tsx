@@ -5,6 +5,7 @@ import type { CaseMode } from "./components/GameCase3D";
 import { IconLogout, IconPlus, IconSearch } from "./components/icons";
 import { Backdrop, CaseGrid, EmptyLibrary, Hero, LibrarySkeleton, Rail, useTint } from "./components/Library";
 import { Login } from "./components/Login";
+import { BuySearch } from "./components/BuySearch";
 import { CollectionValue } from "./components/CollectionValue";
 import { ScanAll } from "./components/ScanAll";
 import { DiscSpinner, Logo } from "./components/Logo";
@@ -237,7 +238,11 @@ export default function App() {
               ) : (
                 <CaseGrid games={shown} onOpen={open} onSelect={select} selectedId={selected?.id ?? null} />
               )
-            ) : (
+            ) : null}
+            {browsing && filter !== "loaned" && q.trim() !== "" && (
+              <BuySearch query={q} games={games} initialPlatform={filter === "all" ? "ps5" : filter} onOpenOwned={(g) => open(g)} />
+            )}
+            {browsing ? null : (
               <>
                 <Rail id="rail-recent" title="Derniers rangés" games={games.slice(0, 12)} onOpen={open} onSelect={select} selectedId={selected?.id ?? null} />
                 {PLATFORM_ORDER.filter((p) => counts[p] > 0).map((p) => (

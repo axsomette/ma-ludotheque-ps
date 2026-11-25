@@ -12,8 +12,19 @@ export interface Offer {
   image: string | null;
 }
 
+export interface Estimate {
+  value: number;
+  low: number;
+  high: number;
+  n: number;
+  confidence: "high" | "medium" | "low";
+  basis: string;
+}
+
 export interface MarketResult {
-  estimate: { value: number; low: number; high: number; n: number; confidence: "high" | "medium" | "low"; basis: string } | null;
+  estimate: Estimate | null;
+  /** Les trois cotes à la fois (neuf, complet, disque seul). */
+  estimates?: Record<Condition, Estimate | null>;
   condition: Condition;
   edition: Edition;
   collector_exists: boolean;
@@ -34,10 +45,10 @@ export const CONDITIONS: Array<{ id: Condition; label: string; hint: string }> =
 export const conditionOf = (g: Pick<Game, "condition">): Condition => g.condition ?? "cib";
 
 /** Cote et offres eBay France pour un jeu, selon son état et son édition (fonction market-price). */
-export async function fetchMarket(g: Pick<Game, "title" | "platform" | "condition" | "edition">): Promise<MarketResult> {
+export async function fetchMarket(g: Pick<Game, "title" | "platform"> & Partial<Pick<Game, "condition" | "edition">>): Promise<MarketResult> {
   if (!supabase) throw new MarketNotConfigured("L'estimation des prix n'est pas disponible en mode démo.");
   const { data, error } = await supabase.functions.invoke<MarketResult>("market-price", {
-    body: { title: g.title, platform: g.platform, condition: conditionOf(g), edition: g.edition },
+    body: { title: g.title, platform: g.platform, condition: conditionOf({ condition: g.condition ?? null }), edition: g.edition ?? "standard" },
   });
   if (error) {
     const status = (error as { context?: Response }).context?.status;

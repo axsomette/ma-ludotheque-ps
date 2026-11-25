@@ -124,6 +124,8 @@ Deno.serve(async (req) => {
     const pick = (l: Listing) => ({ title: l.title, price: l.price, shipping: l.shipping, url: l.url, seller: l.seller, feedback: l.sellerFeedback, image: l.image });
     return json(req, {
       estimate: est,
+      // Les trois cotes (pour acheter : neuf, complet d'occasion, disque seul).
+      estimates: { new: estimate(mine, "new"), cib: estimate(mine, "cib"), loose: estimate(mine, "loose") },
       condition,
       edition,
       collector_exists: edition === "collector" || collectorExists(all, title, platform),

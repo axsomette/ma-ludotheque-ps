@@ -356,6 +356,19 @@ input::placeholder { color: #6c7590; }
 .my-prices-row .field { flex: 1 1 130px; }
 .my-prices-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
 .gain { font-weight: 600; color: var(--tint-hi); }
+/* Recherche d'achat (barre de recherche) et fiche d'achat. */
+.buy-search { display: grid; gap: 12px; margin: 28px 0 8px; padding-top: 20px; border-top: 1px solid var(--wire); }
+.buy-search-title { font: 700 18px/1.2 var(--display); letter-spacing: 0.03em; text-wrap: balance; overflow-wrap: anywhere; }
+.buy-search-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.buy-sheet { display: grid; gap: 14px; align-content: start; }
+.buy-head { display: flex; gap: 14px; align-items: flex-start; }
+.buy-head img { width: 84px; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 4px; flex: none; background: var(--deck-2); }
+.buy-head > div { min-width: 0; display: grid; gap: 4px; }
+.buy-head p { margin: 0; }
+.buy-name { font: 700 18px/1.25 var(--display); overflow-wrap: anywhere; }
+.buy-prices { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.buy-prices li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; padding: 8px 10px; border-radius: 4px; background: var(--deck-2); }
+.buy-prices strong { font-size: 16px; }
 .ps5-headline { margin: 0; font-weight: 700; }
 .ps5-details { margin: 0; padding-left: 18px; display: grid; gap: 4px; color: var(--muted); }
 .ps5.tone-good .ps5-headline { color: #7ee0a8; }
