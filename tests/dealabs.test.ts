@@ -37,14 +37,14 @@ describe("Dealabs", () => {
     expect(d[0].published_at).toBe("2026-11-25T15:23:58.000Z");
   });
   it("dans un flux PS5, un titre sans plateforme prend celle du flux", () => {
-    expect(parseFeed(`<rss>${item("Astro Bot", "Leclerc", "39,99€", "ab")}</rss>`, "ps5")[0].platform).toBe("ps5");
+    expect(parseFeed(`<rss>${item("Astro Bot", "Leclerc", "39,99€", "astro-bot-3400001")}</rss>`, "ps5")[0].platform).toBe("ps5");
   });
 });
 
 import { bestByMerchant, type StoreDeal } from "../src/lib/deals";
 
 describe("comparateur des bons plans", () => {
-  const d = (id: string, title: string, merchant: string, price: number): StoreDeal => ({ id, title, merchant, price, link: `https://www.dealabs.com/bons-plans/${id}`, published_at: "2026-11-20T10:00:00Z" });
+  const d = (id: string, title: string, merchant: string, price: number, is_expired = false): StoreDeal => ({ id, title, merchant, price, link: `https://www.dealabs.com/bons-plans/${id}`, published_at: "2026-11-20T10:00:00Z", is_expired });
   const rows = [
     d("1", "Gran Turismo 7 sur PS5", "Amazon", 33.49),
     d("2", "Gran Turismo 7 sur PS5", "E.Leclerc", 31.14),
@@ -57,6 +57,31 @@ describe("comparateur des bons plans", () => {
     expect(bestByMerchant(rows, "Gran Turismo 7", "ps5", "standard").map((x) => [x.merchant, x.price])).toEqual([
       ["Amazon", 29.99],
       ["E.Leclerc", 31.14],
+    ]);
+  });
+  it("promos en cours d'abord, sinon les terminées en repère", () => {
+    const cv = [d("a", "Code Vein II sur PS5", "Micromania Zing", 21.99), d("b", "Code Vein 2 sur PS5", "E.Leclerc", 24.15), d("c", "Jeu Code Vein II sur PS5", "Amazon", 34.99, true)];
+    expect(bestByMerchant(cv, "Code Vein II", "ps5", "standard").map((x) => x.merchant)).toEqual(["Micromania Zing", "E.Leclerc"]);
+    expect(bestByMerchant(cv.slice(2), "Code Vein II", "ps5", "standard").map((x) => [x.merchant, x.is_expired])).toEqual([["Amazon", true]]);
+  });
+});
+
+import { parseSearch, threadId } from "../supabase/functions/sync-deals/dealabs";
+
+describe("recherche Dealabs", () => {
+  const vue = (t: object) => `<div data-vue3='${JSON.stringify({ name: "ThreadMainListItemNormalizer", props: { thread: t } }).replace(/'/g, "&#039;").replace(/"/g, "&quot;")}'></div>`;
+  it("numéro de bon plan", () => {
+    expect(threadId("https://www.dealabs.com/bons-plans/gta-vi-3469009")).toBe("3469009");
+    expect(threadId("https://www.dealabs.com/share-deal/3456528")).toBe("3456528");
+  });
+  it("lit les bons plans PlayStation d'une page de recherche, avec statut", () => {
+    const html =
+      vue({ title: "Code Vein II sur PS5", price: 21.99, merchant: { merchantName: "Micromania Zing" }, publishedAt: 1794698611, shareableLink: "https://www.dealabs.com/share-deal/3455763", isExpired: false }) +
+      vue({ title: "CODE VEIN II sur Xbox Series X", price: 29.99, merchant: { merchantName: "Cdiscount" }, publishedAt: 1794707333, shareableLink: "https://www.dealabs.com/share-deal/3455821", isExpired: false }) +
+      vue({ title: "Jeu Code Vein II sur PS5", price: 34.99, merchant: { merchantName: "Amazon" }, publishedAt: 1794000000, shareableLink: "https://www.dealabs.com/share-deal/3362155", isExpired: true });
+    expect(parseSearch(html).map((d) => [d.id, d.merchant, d.price, d.is_expired])).toEqual([
+      ["dealabs:3455763", "Micromania Zing", 21.99, false],
+      ["dealabs:3362155", "Amazon", 34.99, true],
     ]);
   });
 });

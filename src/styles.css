@@ -374,6 +374,8 @@ input::placeholder { color: #6c7590; }
 .deal-price { font-weight: 700; font-size: 17px; }
 .deal.is-best .deal-price { color: #7ee0a8; }
 .deal-meta { grid-column: 1 / -1; }
+.deal.is-expired { opacity: 0.6; }
+.deal.is-expired .deal-price { text-decoration: line-through; }
 .buy-prices { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .buy-prices li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; padding: 8px 10px; border-radius: 4px; background: var(--deck-2); }
 .buy-prices strong { font-size: 16px; }

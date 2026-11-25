@@ -22,6 +22,10 @@ describe("pertinence des annonces", () => {
     expect(matches(L("Red Dead Redemption 2 PS4 édition collector", 300), T, "ps4", "standard")).toBe(false);
     expect(matches(L("Red Dead Redemption 2 PS4 édition collector", 300), T, "ps4", "collector")).toBe(true);
   });
+  it("un mot du titre n'est pas exclu (« Code Vein » n'est pas un code de téléchargement)", () => {
+    expect(matches(L("Code Vein II sur PS5", 22), "Code Vein II", "ps5", "standard")).toBe(true);
+    expect(matches(L("Code PSN Code Vein II PS5", 22), "Code Vein II", "ps5", "standard")).toBe(false);
+  });
   it("détecte une édition collector", () => {
     const all = [L("Red Dead Redemption 2 Collector PS4", 250), L("Red Dead Redemption 2 PS4 collector's box", 280), L("Red Dead Redemption 2 PS4", 20)];
     expect(collectorExists(all, T, "ps4")).toBe(true);

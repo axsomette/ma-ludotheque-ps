@@ -9,6 +9,7 @@ export interface StoreDeal {
   price: number;
   link: string;
   published_at: string;
+  is_expired: boolean;
 }
 
 const LABEL: Record<Platform, string> = { ps3: "PS3", ps4: "PS4", ps5: "PS5" };
@@ -20,11 +21,12 @@ const DAYS = 90;
  */
 export async function findDeals(title: string, platform: Platform, edition: Edition = "standard"): Promise<StoreDeal[]> {
   if (!supabase) return [];
-  await supabase.functions.invoke("sync-deals", { body: {} }).catch(() => undefined);
+  // Recherche ciblée du jeu sur Dealabs (côté serveur), puis lecture de tout ce qui est connu.
+  await supabase.functions.invoke("sync-deals", { body: { q: title } }).catch(() => undefined);
   const since = new Date(Date.now() - DAYS * 86_400_000).toISOString();
   const { data, error } = await supabase
     .from("deals")
-    .select("id,title,merchant,price,link,published_at")
+    .select("id,title,merchant,price,link,published_at,is_expired")
     .eq("platform", platform)
     .gte("published_at", since)
     .not("price", "is", null)
@@ -34,11 +36,19 @@ export async function findDeals(title: string, platform: Platform, edition: Edit
   return bestByMerchant((data ?? []) as StoreDeal[], title, platform, edition);
 }
 
-/** Bons plans du jeu (titre, plateforme, édition), le moins cher par boutique, triés par prix. */
+/**
+ * Bons plans du jeu (titre, plateforme, édition), le moins cher par boutique, triés par prix.
+ * Les promos en cours d'abord ; s'il n'y en a aucune, les promos terminées servent de repère (is_expired).
+ */
 export function bestByMerchant(rows: StoreDeal[], title: string, platform: Platform, edition: Edition): StoreDeal[] {
+  const mine = rows.filter((r) => matches({ title: `${r.title} ${LABEL[platform]}` }, title, platform, edition));
+  const active = mine.filter((r) => !r.is_expired);
+  return cheapestPerMerchant(active.length ? active : mine);
+}
+
+function cheapestPerMerchant(rows: StoreDeal[]): StoreDeal[] {
   const best = new Map<string, StoreDeal>();
   for (const r of rows) {
-    if (!matches({ title: `${r.title} ${LABEL[platform]}` }, title, platform, edition)) continue;
     const key = (r.merchant ?? "Autre").toLowerCase();
     const cur = best.get(key);
     if (!cur || Number(r.price) < Number(cur.price)) best.set(key, { ...r, price: Number(r.price) });

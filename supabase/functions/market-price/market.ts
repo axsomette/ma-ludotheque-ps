@@ -57,7 +57,7 @@ const PLATFORM_RE: Record<Platform, RegExp> = {
 
 // Annonces qui ne sont pas « le jeu seul » : lots, consoles, accessoires, boîtiers vides, codes, guides…
 const JUNK =
-  /\b(lot|lots|bundle|pack|console|manette|controller|casque|volant|pedales|pedalier|boitier vide|boite vide|jaquette seule|sans (le )?jeu|notice seule|steelbook seul|code|dlc|digital|dematerialise|cle|key|guide|soluce|artbook|figurine seule|poster|affiche|carte|pass|season|abonnement|ps plus|reparation|hs)\b/i;
+  /\b(lot|lots|bundle|pack|console|manette|controller|casque|volant|pedales|pedalier|boitier vide|boite vide|jaquette seule|sans (le )?jeu|notice seule|steelbook seul|code|psn|dlc|digital|dematerialise|cle|key|guide|soluce|artbook|figurine seule|poster|affiche|carte|pass|season|abonnement|ps plus|reparation|hs)\b/i;
 const COLLECTOR = /\b(collector|collectors|collector's|edition collector|limited|limitee|edition limitee|steelbook)\b/i;
 const LOOSE = /\b(sans boite|sans boitier|disque seul|cd seul|loose|sans jaquette)\b/i;
 
@@ -73,7 +73,10 @@ export function requiredWords(title: string): string[] {
 /** L'annonce correspond-elle à ce jeu, sur cette plateforme, dans cette édition ? */
 export function matches(l: Pick<Listing, "title">, title: string, platform: Platform, edition: Edition): boolean {
   const t = flat(l.title);
-  if (JUNK.test(t)) return false;
+  // Les mots du titre du jeu ne comptent pas comme exclus (« Code Vein », « Pack », « Console Wars »…).
+  const own = new Set(words(title));
+  const rest = t.split(/([^a-z0-9]+)/).filter((w) => !own.has(ROMAN[w] ?? w)).join("");
+  if (JUNK.test(rest)) return false;
   if (!PLATFORM_RE[platform].test(t)) return false;
   const have = new Set(words(l.title));
   if (!requiredWords(title).every((w) => have.has(w))) return false;

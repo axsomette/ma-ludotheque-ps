@@ -117,11 +117,11 @@ export function BuySheet({ candidate, platform, owned, onOpenOwned, onClose }: P
               <ul className="deal-list">
                 {deals!.map((d, i) => (
                   <li key={d.id}>
-                    <a href={d.link} target="_blank" rel="noopener noreferrer" className={`deal ${i === 0 ? "is-best" : ""}`}>
+                    <a href={d.link} target="_blank" rel="noopener noreferrer" className={`deal ${d.is_expired ? "is-expired" : i === 0 ? "is-best" : ""}`}>
                       <span className="deal-merchant">{d.merchant ?? "Boutique"}</span>
                       <span className="deal-price mono">{d.price === 0 ? "Gratuit" : euros(d.price, 2)}</span>
                       <span className="deal-meta muted small">
-                        {i === 0 ? "Meilleur prix · " : ""}repéré {since(d.published_at.slice(0, 10))}
+                        {d.is_expired ? "Promo terminée · " : i === 0 ? "Meilleur prix · " : ""}repéré {since(d.published_at.slice(0, 10))}
                       </span>
                     </a>
                   </li>

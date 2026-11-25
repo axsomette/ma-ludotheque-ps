@@ -1,8 +1,10 @@
-// Collecte des bons plans PlayStation des flux RSS publics de Dealabs dans la table deals.
-// Appelée chaque heure (GitHub Actions) et à l'ouverture d'une fiche d'achat ; sans données
-// personnelles, elle ne demande pas de session, mais ne relit les flux qu'une fois par quart d'heure.
+// Bons plans PlayStation de Dealabs, enregistrés dans la table deals.
+// - Sans paramètre : collecte des flux RSS publics (chaque heure via GitHub Actions) ; sans données
+//   personnelles, pas de session demandée, mais au plus une collecte par quart d'heure.
+// - Avec { q } : recherche ciblée d'un jeu (page de recherche Dealabs, autorisée par leur robots.txt) ;
+//   réservée aux utilisateurs connectés, avec quota, et la même recherche n'est relancée qu'après 20 minutes.
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { FEEDS, parseFeed, type Deal } from "./dealabs.ts";
+import { FEEDS, parseFeed, parseSearch, type Deal } from "./dealabs.ts";
 
 const allowed = (Deno.env.get("ALLOWED_ORIGINS") ?? "http://localhost:5173")
   .split(",")
@@ -25,12 +27,61 @@ function json(req: Request, body: unknown, status = 200): Response {
 
 const UA = "ma-ludotheque/1.0 (lecteur RSS, collection personnelle de jeux PlayStation)";
 const EVERY = 15 * 60 * 1000;
+const SEARCH_EVERY = 20 * 60 * 1000;
+
+/** Clé publique du projet : nouvelle clé « publishable » si présente, sinon l'ancienne clé anon. */
+function publicKey(): string {
+  try {
+    const keys = JSON.parse(Deno.env.get("SUPABASE_PUBLISHABLE_KEYS") ?? "{}");
+    const k = keys.default ?? Object.values(keys)[0];
+    if (typeof k === "string" && k) return k;
+  } catch {
+    // variable absente ou illisible : on retombe sur l'ancienne clé
+  }
+  return Deno.env.get("SUPABASE_ANON_KEY")!;
+}
+
+// deno-lint-ignore no-explicit-any
+async function save(db: any, deals: Deal[]) {
+  const rows = [...new Map(deals.map((d) => [d.id, { ...d, seen_at: new Date().toISOString() }])).values()];
+  if (!rows.length) return 0;
+  const { error } = await db.from("deals").upsert(rows, { onConflict: "id" });
+  if (error) throw error;
+  return rows.length;
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders(req) });
   if (req.method !== "POST") return json(req, { error: "POST attendu" }, 405);
   try {
     const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
+    const body = await req.json().catch(() => ({}));
+
+    // --- Recherche ciblée d'un jeu ---
+    if (typeof body.q === "string" && body.q.trim()) {
+      const q = body.q.replace(/\s+/g, " ").trim().slice(0, 80);
+      const user = createClient(Deno.env.get("SUPABASE_URL")!, publicKey(), {
+        global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
+      });
+      const { data: auth } = await user.auth.getUser();
+      if (!auth.user) return json(req, { error: "Non connecté" }, 401);
+      const key = `search:${q.toLowerCase()}`;
+      const { data: last } = await db.from("app_state").select("value").eq("key", key).maybeSingle();
+      if (last && Date.now() - new Date(last.value).getTime() < SEARCH_EVERY) return json(req, { cached: true });
+      const { data: ok, error: qerr } = await user.rpc("take_quota", { fn: "search-deals" });
+      if (qerr) throw qerr;
+      if (ok !== true) return json(req, { error: "Trop de recherches de prix pour l'instant. Réessaie dans une heure." }, 429);
+      await db.from("app_state").upsert({ key, value: new Date().toISOString() });
+      const r = await fetch(`https://www.dealabs.com/search?q=${encodeURIComponent(q)}`, {
+        headers: { "User-Agent": UA, Accept: "text/html", "Accept-Language": "fr-FR" },
+        redirect: "follow",
+        signal: AbortSignal.timeout(12000),
+      });
+      if (!r.ok) throw new Error(`Recherche Dealabs ${r.status}`);
+      return json(req, { stored: await save(db, parseSearch(await r.text())) });
+    }
+
+    // --- Collecte des flux RSS ---
 
     const { data: state } = await db.from("app_state").select("value").eq("key", "deals_sync").maybeSingle();
     if (state && Date.now() - new Date(state.value).getTime() < EVERY) return json(req, { skipped: true, last: state.value });
@@ -46,14 +97,12 @@ Deno.serve(async (req) => {
         console.warn((e as Error).message);
       }
     }
-    const unique = [...new Map(all.map((d) => [d.id, { ...d, seen_at: new Date().toISOString() }])).values()];
-    if (unique.length) {
-      const { error } = await db.from("deals").upsert(unique, { onConflict: "id" });
-      if (error) throw error;
-    }
-    // Historique limité à 6 mois.
+    // Un bon plan déjà vu en recherche garde son statut « terminé » : le flux ne le remet pas à jour.
+    const stored = await save(db, all.map(({ is_expired: _, ...d }) => d as Deal));
+    // Historique limité à 6 mois, et anciennes recherches oubliées.
     await db.from("deals").delete().lt("published_at", new Date(Date.now() - 183 * 86_400_000).toISOString());
-    return json(req, { stored: unique.length });
+    await db.from("app_state").delete().like("key", "search:%").lt("value", new Date(Date.now() - 86_400_000).toISOString());
+    return json(req, { stored });
   } catch (e) {
     console.error(e);
     return json(req, { error: "La collecte des bons plans a échoué." }, 500);

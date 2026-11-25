@@ -4,7 +4,7 @@
 export type Platform = "ps3" | "ps4" | "ps5";
 
 export interface Deal {
-  id: string; // adresse du bon plan, unique
+  id: string; // « dealabs:<numéro du bon plan> », unique
   title: string;
   merchant: string | null;
   price: number | null;
@@ -12,6 +12,13 @@ export interface Deal {
   image: string | null;
   platform: Platform | null;
   published_at: string; // ISO
+  /** Promo signalée comme terminée sur Dealabs. */
+  is_expired: boolean;
+}
+
+/** Numéro du bon plan, quelle que soit la forme de l'adresse (…/bons-plans/titre-3469009, …/share-deal/3469009). */
+export function threadId(link: string): string | null {
+  return link.match(/(\d{4,})(?:[/?#].*)?$/)?.[1] ?? null;
 }
 
 /** Flux lus, et la plateforme qu'ils concernent (null : à déduire du titre). */
@@ -67,8 +74,10 @@ export function parseFeed(xml: string, feedPlatform: Platform | null): Deal[] {
     if (!platform) continue;
     const date = new Date(tag("pubDate") ?? "");
     const image = it.match(/<media:content[^>]*url="([^"]+)"/)?.[1] ?? null;
+    const num = threadId(link);
+    if (!num) continue;
     out.push({
-      id: link,
+      id: `dealabs:${num}`,
       title: title.slice(0, 300),
       merchant: attr("name") ? decode(attr("name")!).slice(0, 80) : null,
       price: parsePrice(attr("price") ? decode(attr("price")!) : null),
@@ -76,7 +85,47 @@ export function parseFeed(xml: string, feedPlatform: Platform | null): Deal[] {
       image: image && /^https:\/\/static-pepper\.dealabs\.com\//.test(image) ? image : null,
       platform,
       published_at: (Number.isNaN(date.getTime()) ? new Date() : date).toISOString(),
+      is_expired: false,
     });
   }
   return out;
+}
+
+/**
+ * Bons plans d'une page de recherche Dealabs (https://www.dealabs.com/search?q=…). Chaque bon plan y est décrit
+ * par un composant (attribut data-vue3) dont les propriétés « thread » donnent titre, prix, boutique, date et statut.
+ * Seuls les bons plans PlayStation sont gardés.
+ */
+export function parseSearch(html: string): Deal[] {
+  const out: Deal[] = [];
+  for (const m of html.matchAll(/data-vue3=(?:'([^']*)'|"([^"]*)")/g)) {
+    // deno-lint-ignore no-explicit-any
+    let j: any;
+    try {
+      j = JSON.parse(decode(m[1] ?? m[2] ?? ""));
+    } catch {
+      continue;
+    }
+    const t = j?.props?.thread;
+    if (!t || typeof t.title !== "string") continue;
+    const title = decode(t.title).slice(0, 300);
+    const platform = platformOf(title);
+    const link = String(t.shareableLink ?? t.link ?? "");
+    const num = threadId(link) ?? (t.threadId != null ? String(t.threadId) : null);
+    if (!platform || !num || !/^https:\/\/www\.dealabs\.com\//.test(link)) continue;
+    const price = typeof t.price === "number" && t.price >= 0 && t.price < 100000 ? t.price : null;
+    const when = typeof t.publishedAt === "number" ? new Date(t.publishedAt * 1000) : new Date();
+    out.push({
+      id: `dealabs:${num}`,
+      title,
+      merchant: typeof t.merchant?.merchantName === "string" ? t.merchant.merchantName.slice(0, 80) : null,
+      price,
+      link,
+      image: null,
+      platform,
+      published_at: when.toISOString(),
+      is_expired: t.isExpired === true,
+    });
+  }
+  return [...new Map(out.map((d) => [d.id, d])).values()];
 }
