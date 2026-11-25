@@ -3,7 +3,7 @@ import { supabase } from "./supabase";
 import type { CoverCandidate, Game, GamePatch, Platform } from "./types";
 
 /** Message d'erreur renvoyé par une fonction Supabase (ex. quota atteint), sinon le message par défaut. */
-async function functionMessage(error: unknown, fallback: string): Promise<string> {
+export async function functionMessage(error: unknown, fallback: string): Promise<string> {
   const ctx = (error as { context?: Response }).context;
   const body = ctx && typeof ctx.json === "function" ? await ctx.json().catch(() => null) : null;
   return typeof body?.error === "string" && body.error ? body.error : fallback;

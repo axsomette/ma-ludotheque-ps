@@ -11,6 +11,8 @@ import { frenchDate, isLoaned, since, today } from "../lib/loans";
 import { pruneFiles, updateGame } from "../lib/store";
 import type { Game } from "../lib/types";
 import { GameCase3D, type CaseMode } from "./GameCase3D";
+import { MarketPanel } from "./MarketPanel";
+import { Ps5Panel } from "./Ps5Panel";
 import { DiscSpinner } from "./Logo";
 import { IconBack, IconCamera, IconCase, IconDisc, IconFlip, IconOpen, IconTrash } from "./icons";
 
@@ -259,6 +261,9 @@ export function Viewer({ game, initialMode = "front", onClose, onDelete, onUpdat
             )}
           </div>
         )}
+
+        <Ps5Panel game={game} />
+        <MarketPanel game={game} onUpdate={onUpdate} />
 
         <section className={`photos loan ${isLoaned(game) ? "is-out" : ""}`} aria-labelledby="loan-title">
           <h3 id="loan-title">Prêt</h3>

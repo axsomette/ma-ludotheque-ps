@@ -5,6 +5,7 @@ import type { CaseMode } from "./components/GameCase3D";
 import { IconLogout, IconPlus, IconSearch } from "./components/icons";
 import { Backdrop, CaseGrid, EmptyLibrary, Hero, LibrarySkeleton, Rail, useTint } from "./components/Library";
 import { Login } from "./components/Login";
+import { CollectionValue } from "./components/CollectionValue";
 import { ScanAll } from "./components/ScanAll";
 import { DiscSpinner, Logo } from "./components/Logo";
 import { generatedCover } from "./lib/canvasArt";
@@ -193,6 +194,13 @@ export default function App() {
                 </button>
               )}
             </nav>
+
+            {!browsing && !isDemo && (
+              <CollectionValue
+                games={games}
+                onUpdated={(updated) => setGames((list) => list.map((x) => (x.id === updated.id ? updated : x)))}
+              />
+            )}
 
             {!browsing && !isDemo && (
               <ScanAll

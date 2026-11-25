@@ -24,12 +24,25 @@ export interface Game {
   loaned_to: string | null;
   /** Date du prêt, AAAA-MM-JJ. */
   loaned_at: string | null;
+  /** État de l'exemplaire : disque seul, complet (boîte + notice), neuf sous blister. null = complet par défaut. */
+  condition: Condition | null;
+  edition: Edition;
+  /** Dernière cote calculée (euros) et sa fourchette, nombre d'annonces et date du calcul. */
+  value_eur: number | null;
+  value_low: number | null;
+  value_high: number | null;
+  value_n: number | null;
+  value_at: string | null;
   created_at: string;
 }
 
-export type NewGame = Omit<Game, "id" | "created_at" | "loaned_to" | "loaned_at"> & Partial<Pick<Game, "loaned_to" | "loaned_at">>;
+export type Condition = "loose" | "cib" | "new";
+export type Edition = "standard" | "collector";
+
+type Optional = "loaned_to" | "loaned_at" | "condition" | "edition" | "value_eur" | "value_low" | "value_high" | "value_n" | "value_at";
+export type NewGame = Omit<Game, "id" | "created_at" | Optional> & Partial<Pick<Game, Optional>>;
 export type GamePatch = Partial<
-  Pick<Game, "back_url" | "disc_url" | "title" | "summary" | "publisher" | "genres" | "pegi" | "screenshots" | "release_year" | "loaned_to" | "loaned_at">
+  Pick<Game, "back_url" | "disc_url" | "title" | "summary" | "publisher" | "genres" | "pegi" | "screenshots" | "release_year" | Optional>
 >;
 
 /** Un résultat de recherche de jaquette. */
@@ -51,7 +64,7 @@ export interface CoverCandidate {
 }
 
 export const GAME_COLUMNS =
-  "id,title,platform,igdb_id,cover_url,release_year,summary,publisher,genres,pegi,screenshots,back_url,disc_url,loaned_to,loaned_at,created_at";
+  "id,title,platform,igdb_id,cover_url,release_year,summary,publisher,genres,pegi,screenshots,back_url,disc_url,loaned_to,loaned_at,condition,edition,value_eur,value_low,value_high,value_n,value_at,created_at";
 
 /** Complète un jeu ancien (ou de la démo) avec les champs ajoutés depuis. */
 export function normalizeGame(g: Partial<Game> & Pick<Game, "id" | "title" | "platform">): Game {
@@ -66,6 +79,13 @@ export function normalizeGame(g: Partial<Game> & Pick<Game, "id" | "title" | "pl
     disc_url: null,
     loaned_to: null,
     loaned_at: null,
+    condition: null,
+    edition: "standard",
+    value_eur: null,
+    value_low: null,
+    value_high: null,
+    value_n: null,
+    value_at: null,
     created_at: new Date(0).toISOString(),
     ...g,
     genres: g.genres ?? [],

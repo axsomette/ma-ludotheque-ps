@@ -12,3 +12,6 @@ verify_jwt = false
 
 [functions.fetch-scans]
 verify_jwt = false
+
+[functions.market-price]
+verify_jwt = false
