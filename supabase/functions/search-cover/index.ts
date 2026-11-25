@@ -121,19 +121,41 @@ function localName(g: any, q: string): string | null {
   return (names.find((n) => contains(n.name, q)) ?? names.find((n) => n.french))?.name ?? null;
 }
 
-/** Sans doublon, le titre exact (anglais ou français) d'abord, puis l'ordre de pertinence d'IGDB. */
+// Jeux de fans et projets amateurs : jamais vendus en boîte.
+const FAN_MADE = /\bfan[- ]?(?:made|created|game|project)\b|\bunofficial\b/i;
+// Éditions d'un même jeu : proposées après le jeu de base.
+const EDITION = /\b(?:edition|bundle|collection|pack)\b/i;
+
+/**
+ * Résultats utiles pour une collection physique, du plus probable au moins probable :
+ * sans doublon ni jeu de fan ni jeu pas encore sorti ; titre exact (toutes langues), puis titre contenant
+ * la recherche ; à égalité, les jeux sortis et classés PEGI (vendus en boîte en Europe) et le jeu de base
+ * avant ses éditions ; enfin l'ordre de pertinence d'IGDB.
+ */
 // deno-lint-ignore no-explicit-any
-function rankGames(list: any[], q: string): any[] {
+function rankGames(list: any[], q: string, pegi: Map<number, number>, now = Date.now()): any[] {
+  const unique = list.filter(
+    // deno-lint-ignore no-explicit-any
+    (g, i) => g.cover?.image_id && list.findIndex((x: any) => x.id === g.id) === i,
+  );
+  const kept = unique.filter(
+    (g) => !FAN_MADE.test(String(g.name)) && !(typeof g.first_release_date === "number" && g.first_release_date * 1000 > now),
+  );
   // deno-lint-ignore no-explicit-any
-  const unique = list.filter((g, i) => g.cover?.image_id && list.findIndex((x: any) => x.id === g.id) === i);
-  // deno-lint-ignore no-explicit-any
-  const score = (g: any) => {
+  const match = (g: any) => {
     const names = [g.name, ...otherNames(g).map((n) => n.name)];
     if (names.some((n) => same(n, q))) return 0;
     if (names.some((n) => contains(n, q))) return 1;
     return 2;
   };
-  return unique.map((g, i) => ({ g, i, s: score(g) })).sort((a, b) => a.s - b.s || a.i - b.i).map((x) => x.g);
+  // deno-lint-ignore no-explicit-any
+  const retail = (g: any) => (pegi.has(g.id) && g.first_release_date ? 0 : 1);
+  // deno-lint-ignore no-explicit-any
+  const edition = (g: any) => (EDITION.test(String(g.name)) ? 1 : 0);
+  return kept
+    .map((g, i) => ({ g, i, k: [match(g), retail(g), edition(g)] }))
+    .sort((a, b) => a.k[0] - b.k[0] || a.k[1] - b.k[1] || a.k[2] - b.k[2] || a.i - b.i)
+    .map((x) => x.g);
 }
 
 const PEGI_WORDS: Record<string, number> = { three: 3, seven: 7, twelve: 12, sixteen: 16, eighteen: 18 };
@@ -236,9 +258,10 @@ Deno.serve(async (req) => {
       const wider = `platforms = (${PLAYSTATIONS}) & cover != null`;
       [found, local] = await Promise.all([search(wider), byLocalName(wider)]);
     }
-    const games = rankGames([...found, ...local], q).slice(0, 12);
+    const candidates = [...found, ...local];
+    const pegi = await pegiFor([...new Set(candidates.map((g) => g.id))].slice(0, 24));
+    const games = rankGames(candidates, q, pegi).slice(0, 12);
 
-    const pegi = await pegiFor(games.map((g) => g.id));
 
     const results = games.map((g) => ({
       igdb_id: g.id,
