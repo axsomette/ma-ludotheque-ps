@@ -81,7 +81,7 @@ export function AddGame({ onClose, onAdd, existing, onOpenExisting }: Props) {
       setResults(await searchCovers(q, pf));
     } catch (e) {
       setError((e as Error).message);
-      setResults([]);
+      setResults(null); // pas de « Aucun jeu trouvé » : la recherche n'a pas eu lieu
     } finally {
       setSearching(false);
     }
