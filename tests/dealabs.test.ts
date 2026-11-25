@@ -51,6 +51,7 @@ describe("comparateur des bons plans", () => {
     d("3", "Gran Turismo 7 sur PS5", "Amazon", 29.99),
     d("4", "Console PS5 Slim + Gran Turismo 7", "Fnac", 449),
     d("5", "Gran Turismo Sport sur PS4", "Fnac", 9.99),
+    d("6", "Pack Logitech G29 : volant + pédales + Gran Turismo 7 PS5", "Cdiscount", 199.99),
   ];
   it("le moins cher par boutique, du moins cher au plus cher, sans les packs console", () => {
     expect(bestByMerchant(rows, "Gran Turismo 7", "ps5", "standard").map((x) => [x.merchant, x.price])).toEqual([

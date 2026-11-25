@@ -57,7 +57,7 @@ const PLATFORM_RE: Record<Platform, RegExp> = {
 
 // Annonces qui ne sont pas « le jeu seul » : lots, consoles, accessoires, boîtiers vides, codes, guides…
 const JUNK =
-  /\b(lot|lots|bundle|console|manette|controller|casque|boitier vide|boite vide|jaquette seule|sans (le )?jeu|notice seule|steelbook seul|code|dlc|digital|dematerialise|cle|key|guide|soluce|artbook|figurine seule|poster|affiche|carte|pass|season|abonnement|ps plus|reparation|hs)\b/i;
+  /\b(lot|lots|bundle|pack|console|manette|controller|casque|volant|pedales|pedalier|boitier vide|boite vide|jaquette seule|sans (le )?jeu|notice seule|steelbook seul|code|dlc|digital|dematerialise|cle|key|guide|soluce|artbook|figurine seule|poster|affiche|carte|pass|season|abonnement|ps plus|reparation|hs)\b/i;
 const COLLECTOR = /\b(collector|collectors|collector's|edition collector|limited|limitee|edition limitee|steelbook)\b/i;
 const LOOSE = /\b(sans boite|sans boitier|disque seul|cd seul|loose|sans jaquette)\b/i;
 
