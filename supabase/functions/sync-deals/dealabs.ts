@@ -52,6 +52,20 @@ export function parsePrice(s: string | undefined | null): number | null {
   return Number.isFinite(n) && n >= 0 && n < 100000 ? n : null;
 }
 
+const TO_ARABIC: Record<string, string> = { II: "2", III: "3", IV: "4", V: "5", VI: "6", VII: "7", VIII: "8", IX: "9", X: "10", XI: "11", XII: "12", XIII: "13", XVI: "16" };
+const TO_ROMAN = Object.fromEntries(Object.entries(TO_ARABIC).map(([r, a]) => [a, r]));
+
+/**
+ * Recherches à lancer pour un titre : tel quel, puis avec les numéros écrits autrement
+ * (« Code Vein II » → « Code Vein 2 » ; « Red Dead Redemption 2 » → « Red Dead Redemption II »).
+ */
+export function searchVariants(title: string): string[] {
+  const t = title.replace(/\s+/g, " ").trim();
+  const arabic = t.replace(/\b(XVI|XIII|XII|XI|IX|X|VIII|VII|VI|IV|V|III|II)\b/g, (m) => TO_ARABIC[m] ?? m);
+  const roman = t.replace(/\b(1[0-3]|16|[2-9])\b/g, (m) => TO_ROMAN[m] ?? m);
+  return [...new Set([t, arabic, roman])].slice(0, 3);
+}
+
 /** Plateforme d'après le titre du bon plan (PS5 avant PS4 : « PS4/PS5 » compte comme PS5). */
 export function platformOf(title: string): Platform | null {
   if (/\b(ps ?5|playstation ?5)\b/i.test(title)) return "ps5";

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { findDeals, type StoreDeal } from "../lib/deals";
 import { since } from "../lib/loans";
-import { euros, fetchMarket, MarketNotConfigured, priceChartingUrl, type Estimate, type MarketResult } from "../lib/market";
+import { euros, fetchMarket, MarketNotConfigured, priceChartingUrl, storeLinks, type Estimate, type MarketResult } from "../lib/market";
 import { PLATFORMS } from "../lib/platforms";
 import type { CoverCandidate, Edition, Game, Platform } from "../lib/types";
 import { BuyOffers } from "./BuyOffers";
@@ -40,6 +40,7 @@ export function BuySheet({ candidate, platform, owned, onOpenOwned, onClose }: P
   const [result, setResult] = useState<MarketResult | null>(null);
   const [busy, setBusy] = useState(true);
   const [note, setNote] = useState<string | null>(null);
+  const [noEbay, setNoEbay] = useState(false);
   const dialog = useRef<HTMLDivElement>(null);
   const [deals, setDeals] = useState<StoreDeal[] | null>(null);
   const [dealsError, setDealsError] = useState<string | null>(null);
@@ -51,7 +52,11 @@ export function BuySheet({ candidate, platform, owned, onOpenOwned, onClose }: P
     setNote(null);
     fetchMarket({ ...game, edition })
       .then((r) => live && setResult(r))
-      .catch((e) => live && setNote(e instanceof MarketNotConfigured ? e.message : (e as Error).message))
+      .catch((e) => {
+        if (!live) return;
+        if (e instanceof MarketNotConfigured) setNoEbay(true);
+        else setNote((e as Error).message);
+      })
       .finally(() => live && setBusy(false));
     return () => {
       live = false;
@@ -111,7 +116,7 @@ export function BuySheet({ candidate, platform, owned, onOpenOwned, onClose }: P
           ) : dealsError ? (
             <p className="muted small">{dealsError}</p>
           ) : deals!.length === 0 ? (
-            <p className="muted small">Aucun prix repéré pour ce jeu ces 90 derniers jours. Les prix se remplissent automatiquement chaque heure : reviens plus tard, ou compare avec les boutiques plus bas.</p>
+            <p className="muted small">Aucune promo repérée pour ce jeu ces 90 derniers jours. Les prix se mettent à jour chaque heure : en attendant, compare directement sur les boutiques ci-dessous.</p>
           ) : (
             <>
               <ul className="deal-list">
@@ -130,8 +135,23 @@ export function BuySheet({ candidate, platform, owned, onOpenOwned, onClose }: P
               <p className="muted small">Prix repérés sur Dealabs (bons plans de la communauté) : une promo peut avoir pris fin, vérifie sur le site.</p>
             </>
           )}
+          <p className="store-links small">
+            <span className="muted">Pas le bon prix ? Voir sur </span>
+            {storeLinks(game)
+              .filter((l) => l.name !== "Dealabs")
+              .map((l, i, all) => (
+                <span key={l.name}>
+                  <a href={l.url} target="_blank" rel="noopener noreferrer">
+                    {l.name}
+                  </a>
+                  {i < all.length - 1 ? " · " : ""}
+                </span>
+              ))}
+          </p>
+          {result?.offers && <BuyOffers game={game} offers={result.offers} withStores={false} />}
         </section>
 
+        {!noEbay && (
         <section className="photos market" aria-labelledby="buy-price-title">
           <h3 id="buy-price-title">Cote du moment</h3>
           {(result?.collector_exists || edition === "collector") && (
@@ -166,11 +186,8 @@ export function BuySheet({ candidate, platform, owned, onOpenOwned, onClose }: P
             Comparer avec la cote PriceCharting
           </a>
         </section>
+        )}
 
-        <section className="photos market" aria-labelledby="buy-offers-title">
-          <h3 id="buy-offers-title">Où l'acheter</h3>
-          <BuyOffers game={game} offers={busy || note ? null : (result?.offers ?? null)} />
-        </section>
 
         <Ps5Panel game={game} />
       </div>

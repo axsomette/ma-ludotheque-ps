@@ -17,7 +17,7 @@ function OfferRow({ o }: { o: Offer }) {
 }
 
 /** Meilleures offres eBay (vendeurs bien notés) et liens vers les boutiques françaises reconnues. */
-export function BuyOffers({ game, offers }: { game: Pick<Game, "title" | "platform">; offers: { new: Offer[]; used: Offer[] } | null }) {
+export function BuyOffers({ game, offers, withStores = true }: { game: Pick<Game, "title" | "platform">; offers: { new: Offer[]; used: Offer[] } | null; withStores?: boolean }) {
   return (
     <>
       {offers && offers.new.length > 0 && (
@@ -33,8 +33,8 @@ export function BuyOffers({ game, offers }: { game: Pick<Game, "title" | "platfo
         </>
       )}
       {offers && !offers.new.length && !offers.used.length && <p className="muted small">Aucune offre de vendeur bien noté sur eBay France pour l'instant.</p>}
-      <p className="muted small">Comparer dans les boutiques françaises reconnues :</p>
-      <ul className="stores">
+      {withStores && <p className="muted small">Comparer dans les boutiques françaises reconnues :</p>}
+      {withStores && <ul className="stores">
         {storeLinks(game).map((l) => (
           <li key={l.name}>
             <a href={l.url} target="_blank" rel="noopener noreferrer">
@@ -43,7 +43,7 @@ export function BuyOffers({ game, offers }: { game: Pick<Game, "title" | "platfo
             </a>
           </li>
         ))}
-      </ul>
+      </ul>}
     </>
   );
 }

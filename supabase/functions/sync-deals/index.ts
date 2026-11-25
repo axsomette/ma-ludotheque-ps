@@ -4,7 +4,7 @@
 // - Avec { q } : recherche ciblée d'un jeu (page de recherche Dealabs, autorisée par leur robots.txt) ;
 //   réservée aux utilisateurs connectés, avec quota, et la même recherche n'est relancée qu'après 20 minutes.
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { FEEDS, parseFeed, parseSearch, type Deal } from "./dealabs.ts";
+import { FEEDS, parseFeed, parseSearch, searchVariants, type Deal } from "./dealabs.ts";
 
 const allowed = (Deno.env.get("ALLOWED_ORIGINS") ?? "http://localhost:5173")
   .split(",")
@@ -72,13 +72,18 @@ Deno.serve(async (req) => {
       if (qerr) throw qerr;
       if (ok !== true) return json(req, { error: "Trop de recherches de prix pour l'instant. Réessaie dans une heure." }, 429);
       await db.from("app_state").upsert({ key, value: new Date().toISOString() });
-      const r = await fetch(`https://www.dealabs.com/search?q=${encodeURIComponent(q)}`, {
-        headers: { "User-Agent": UA, Accept: "text/html", "Accept-Language": "fr-FR" },
-        redirect: "follow",
-        signal: AbortSignal.timeout(12000),
-      });
-      if (!r.ok) throw new Error(`Recherche Dealabs ${r.status}`);
-      return json(req, { stored: await save(db, parseSearch(await r.text())) });
+      // Le titre tel quel, puis avec ses numéros écrits autrement (II / 2) : Dealabs ne les rapproche pas.
+      const found: Deal[] = [];
+      for (const v of searchVariants(q)) {
+        const r = await fetch(`https://www.dealabs.com/search?q=${encodeURIComponent(v)}`, {
+          headers: { "User-Agent": UA, Accept: "text/html", "Accept-Language": "fr-FR" },
+          redirect: "follow",
+          signal: AbortSignal.timeout(12000),
+        });
+        if (!r.ok) throw new Error(`Recherche Dealabs ${r.status}`);
+        found.push(...parseSearch(await r.text()));
+      }
+      return json(req, { stored: await save(db, found) });
     }
 
     // --- Collecte des flux RSS ---

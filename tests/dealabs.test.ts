@@ -85,3 +85,13 @@ describe("recherche Dealabs", () => {
     ]);
   });
 });
+
+import { searchVariants } from "../supabase/functions/sync-deals/dealabs";
+
+describe("variantes de recherche", () => {
+  it("numéros romains et arabes", () => {
+    expect(searchVariants("Code Vein II")).toEqual(["Code Vein II", "Code Vein 2"]);
+    expect(searchVariants("Red Dead Redemption 2")).toEqual(["Red Dead Redemption 2", "Red Dead Redemption II"]);
+    expect(searchVariants("Astro Bot")).toEqual(["Astro Bot"]);
+  });
+});
