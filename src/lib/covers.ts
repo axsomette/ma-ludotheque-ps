@@ -91,6 +91,8 @@ export async function fetchDetails(game: Game): Promise<GamePatch | null> {
 }
 
 export class ScansUnavailable extends Error {}
+/** Quota horaire de recherches de scans atteint (inutile de continuer une mise à jour groupée). */
+export class ScansQuotaReached extends Error {}
 
 /**
  * Vrais scans LaunchBox Games DB (dos et disque, version européenne en priorité), via la fonction fetch-scans.
@@ -101,7 +103,11 @@ export async function fetchScans(game: Pick<Game, "title" | "platform" | "back_u
   const { data, error } = await supabase.functions.invoke<{ back_url: string | null; disc_url: string | null; found: boolean }>("fetch-scans", {
     body: { title: game.title, platform: game.platform },
   });
-  if (error) throw new Error(await functionMessage(error, "Les scans n'ont pas pu être récupérés. Réessaie plus tard."));
+  if (error) {
+    const msg = await functionMessage(error, "Les scans n'ont pas pu être récupérés. Réessaie plus tard.");
+    if ((error as { context?: Response }).context?.status === 429) throw new ScansQuotaReached(msg);
+    throw new Error(msg);
+  }
   const patch: GamePatch = {};
   if (!game.back_url && data?.back_url) patch.back_url = data.back_url;
   if (!game.disc_url && data?.disc_url) patch.disc_url = data.disc_url;

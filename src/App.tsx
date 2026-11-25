@@ -5,6 +5,7 @@ import type { CaseMode } from "./components/GameCase3D";
 import { IconLogout, IconPlus, IconSearch } from "./components/icons";
 import { Backdrop, CaseGrid, EmptyLibrary, Hero, LibrarySkeleton, Rail, useTint } from "./components/Library";
 import { Login } from "./components/Login";
+import { ScanAll } from "./components/ScanAll";
 import { DiscSpinner, Logo } from "./components/Logo";
 import { generatedCover } from "./lib/canvasArt";
 import { mix } from "./lib/artUtils";
@@ -182,6 +183,16 @@ export default function App() {
                 </button>
               ))}
             </nav>
+
+            {!browsing && !isDemo && (
+              <ScanAll
+                games={games}
+                onUpdated={(updated) => {
+                  setGames((list) => list.map((x) => (x.id === updated.id ? updated : x)));
+                  setViewing((v) => (v && v.game.id === updated.id ? { ...v, game: updated } : v));
+                }}
+              />
+            )}
 
             {browsing ? (
               shown.length === 0 ? (
