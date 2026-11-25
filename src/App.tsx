@@ -227,6 +227,8 @@ export default function App() {
       {adding && (
         <AddGame
           onClose={() => setAdding(false)}
+          existing={games}
+          onOpenExisting={open}
           onAdd={async (g) => {
             const created = await addGame(g);
             setGames((list) => [created, ...list]);

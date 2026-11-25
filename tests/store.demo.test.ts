@@ -67,4 +67,11 @@ describe("ownCoverPath : seuls les fichiers de son propre dossier sont supprimab
     expect(ownCoverPath("https://images.igdb.com/igdb/image/upload/t_1080p/abc.jpg", uid)).toBeNull();
     expect(ownCoverPath(null, uid)).toBeNull();
   });
+
+  it("refuse un doublon (même titre, même plateforme) mais accepte une autre plateforme", async () => {
+    await addGame(jeu("Astro Bot"));
+    await expect(addGame(jeu("astro  bot"))).rejects.toThrow("déjà dans ta ludothèque");
+    await addGame({ ...jeu("Astro Bot"), platform: "ps4" });
+    expect((await listGames()).length).toBe(2);
+  });
 });

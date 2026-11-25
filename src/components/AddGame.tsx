@@ -1,14 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { saveCover, searchCovers, uploadPhoto } from "../lib/covers";
+import { DuplicateGameError, duplicateMessage, findDuplicate, type GameKey } from "../lib/duplicates";
 import { readCover } from "../lib/ocr";
 import { PLATFORMS, PLATFORM_ORDER } from "../lib/platforms";
-import type { CoverCandidate, NewGame, Platform } from "../lib/types";
+import type { CoverCandidate, Game, NewGame, Platform } from "../lib/types";
 import { IconCamera, IconClose, IconSearch } from "./icons";
 import { DiscSpinner } from "./Logo";
 
 interface Props {
   onClose: () => void;
   onAdd: (g: NewGame) => Promise<void>;
+  /** Jeux déjà rangés, pour signaler les doublons avant l'ajout. */
+  existing: readonly Game[];
+  /** Ouvre un jeu déjà rangé (quand on tente de le ranger une deuxième fois). */
+  onOpenExisting: (g: Game) => void;
 }
 
 type Step = "photo" | "reading" | "search" | "saving";
@@ -24,7 +29,7 @@ const STAGES: Array<{ label: string; steps: Step[] }> = [
  * Ajout d'un jeu : photo → lecture du titre (dans le navigateur) →
  * recherche du jeu sur IGDB → choix → copie de la jaquette et des captures.
  */
-export function AddGame({ onClose, onAdd }: Props) {
+export function AddGame({ onClose, onAdd, existing, onOpenExisting }: Props) {
   const [step, setStep] = useState<Step>("photo");
   const [photo, setPhoto] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -34,6 +39,10 @@ export function AddGame({ onClose, onAdd }: Props) {
   const [results, setResults] = useState<CoverCandidate[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Jeu déjà rangé correspondant au dernier choix (bouton « Voir le jeu »).
+  const [duplicate, setDuplicate] = useState<Game | null>(null);
+  // Verrou contre le double appui : deux ajouts simultanés créeraient un doublon.
+  const busy = useRef(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const dialog = useRef<HTMLDivElement>(null);
 
@@ -78,9 +87,30 @@ export function AddGame({ onClose, onAdd }: Props) {
     }
   }
 
+  /** Signale un doublon sans rien enregistrer. Renvoie true si le jeu est déjà rangé. */
+  function blockDuplicate(key: GameKey): boolean {
+    const dup = findDuplicate(existing, key);
+    if (!dup) return false;
+    setDuplicate(dup);
+    setError(duplicateMessage(key));
+    return true;
+  }
+
+  /** Échec d'un ajout : message, et bouton « Voir le jeu » si c'est un doublon détecté au dernier moment. */
+  function fail(e: unknown) {
+    setDuplicate(e instanceof DuplicateGameError ? e.existing : null);
+    setError((e as Error).message);
+    setStep("search");
+  }
+
   async function choose(c: CoverCandidate) {
-    setStep("saving");
+    if (busy.current) return;
+    setDuplicate(null);
     setError(null);
+    // Avant la copie de la jaquette : inutile de consommer le quota pour un jeu déjà rangé.
+    if (blockDuplicate({ title: c.name, platform, igdb_id: c.igdb_id })) return;
+    busy.current = true;
+    setStep("saving");
     try {
       const { url, screenshots } = await saveCover(c, platform);
       await onAdd({
@@ -99,18 +129,24 @@ export function AddGame({ onClose, onAdd }: Props) {
       });
       onClose();
     } catch (e) {
-      setError((e as Error).message);
-      setStep("search");
+      fail(e);
+    } finally {
+      busy.current = false;
     }
   }
 
   async function usePhoto() {
-    if (!photo) return;
+    if (!photo || busy.current) return;
+    const title = query.trim() || "Jeu sans titre";
+    setDuplicate(null);
+    setError(null);
+    if (blockDuplicate({ title, platform, igdb_id: null })) return;
+    busy.current = true;
     setStep("saving");
     try {
       const cover_url = await uploadPhoto(photo, "front");
       await onAdd({
-        title: query.trim() || "Jeu sans titre",
+        title,
         platform,
         igdb_id: null,
         cover_url,
@@ -125,8 +161,9 @@ export function AddGame({ onClose, onAdd }: Props) {
       });
       onClose();
     } catch (e) {
-      setError((e as Error).message);
-      setStep("search");
+      fail(e);
+    } finally {
+      busy.current = false;
     }
   }
 
@@ -211,9 +248,22 @@ export function AddGame({ onClose, onAdd }: Props) {
             </div>
 
             {error && (
-              <p className="error" role="alert">
-                {error}
-              </p>
+              <div className="error-row">
+                <p className="error" role="alert">
+                  {error}
+                </p>
+                {duplicate && (
+                  <button
+                    className="btn ghost"
+                    onClick={() => {
+                      onOpenExisting(duplicate);
+                      onClose();
+                    }}
+                  >
+                    Voir le jeu
+                  </button>
+                )}
+              </div>
             )}
 
             {step === "saving" && (
@@ -236,15 +286,21 @@ export function AddGame({ onClose, onAdd }: Props) {
               <>
                 <p className="muted small">Choisis la bonne édition :</p>
                 <ul className="results">
-                  {results.map((c) => (
-                    <li key={`${c.igdb_id}-${c.name}`}>
-                      <button onClick={() => choose(c)}>
-                        <img src={c.thumb_url} alt="" loading="lazy" />
-                        <span className="r-name">{c.name}</span>
-                        <span className="r-meta mono">{[c.year, c.pegi ? `PEGI ${c.pegi}` : null].filter(Boolean).join(" · ")}</span>
-                      </button>
-                    </li>
-                  ))}
+                  {results.map((c) => {
+                    const owned = !!findDuplicate(existing, { title: c.name, platform, igdb_id: c.igdb_id });
+                    return (
+                      <li key={`${c.igdb_id}-${c.name}`} className={owned ? "owned" : undefined}>
+                        <button onClick={() => choose(c)} aria-label={owned ? `${c.name}, déjà dans ta ludothèque` : undefined}>
+                          <span className="r-cover">
+                            <img src={c.thumb_url} alt="" loading="lazy" />
+                            {owned && <span className="r-owned">Déjà rangé</span>}
+                          </span>
+                          <span className="r-name">{c.name}</span>
+                          <span className="r-meta mono">{[c.year, c.pegi ? `PEGI ${c.pegi}` : null].filter(Boolean).join(" · ")}</span>
+                        </button>
+                      </li>
+                    );
+                  })}
                 </ul>
               </>
             )}

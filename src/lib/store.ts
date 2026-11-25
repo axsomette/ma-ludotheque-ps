@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { DuplicateGameError, findDuplicate } from "./duplicates";
 import { GAME_COLUMNS, normalizeGame, type Game, type GamePatch, type NewGame } from "./types";
 
 const LOCAL_KEY = "ludotheque-demo-games";
@@ -27,14 +28,26 @@ export async function listGames(): Promise<Game[]> {
   return (data as Game[]).map(normalizeGame);
 }
 
+/**
+ * Range un jeu. Refuse un doublon (même jeu sur la même plateforme) avec une DuplicateGameError :
+ * vérifié ici, et côté base par l'index unique games_user_platform_igdb_key (deux ajouts simultanés).
+ */
 export async function addGame(game: NewGame): Promise<Game> {
   if (!supabase) {
+    const list = readLocal();
+    const dup = findDuplicate(list, game);
+    if (dup) throw new DuplicateGameError(dup, game);
     const g: Game = normalizeGame({ ...game, id: crypto.randomUUID(), created_at: new Date().toISOString() });
-    writeLocal([g, ...readLocal()]);
+    writeLocal([g, ...list]);
     return g;
   }
+  const dup = findDuplicate(await listGames(), game);
+  if (dup) throw new DuplicateGameError(dup, game);
   const { data, error } = await supabase.from("games").insert(game).select(GAME_COLUMNS).single();
-  if (error) throw error;
+  if (error) {
+    if (error.code === "23505") throw new DuplicateGameError(null, game); // violation de l'index unique
+    throw error;
+  }
   return normalizeGame(data as Game);
 }
 
