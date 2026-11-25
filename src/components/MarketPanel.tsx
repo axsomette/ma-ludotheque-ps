@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CONDITIONS, conditionOf, euros, fetchMarket, MarketNotConfigured, storeLinks, valuePatch, type MarketResult, type Offer } from "../lib/market";
+import { CONDITIONS, conditionOf, euros, fetchMarket, MarketNotConfigured, parseEuros, priceChartingUrl, storeLinks, valuePatch, type MarketResult, type Offer } from "../lib/market";
 import { since } from "../lib/loans";
 import { updateGame } from "../lib/store";
 import { isDemo } from "../lib/supabase";
@@ -36,6 +36,38 @@ export function MarketPanel({ game, onUpdate }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [notConfigured, setNotConfigured] = useState<string | null>(isDemo ? "L'estimation des prix n'est pas disponible en mode démo." : null);
   const auto = useRef<string | null>(null);
+  const fmt = (n: number | null) => (n == null ? "" : String(n).replace(".", ","));
+  const [paid, setPaid] = useState(fmt(game.purchase_price));
+  const [mine, setMine] = useState(fmt(game.manual_value));
+  const [priceMsg, setPriceMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPaid(fmt(game.purchase_price));
+    setMine(fmt(game.manual_value));
+    setPriceMsg(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game.id]);
+
+  async function savePrices() {
+    const p = parseEuros(paid);
+    const m = parseEuros(mine);
+    if (p === undefined || m === undefined) {
+      setPriceMsg("Montant invalide : écris par exemple 24,90.");
+      return;
+    }
+    try {
+      onUpdate(await updateGame(game.id, { purchase_price: p, manual_value: m }));
+      setPriceMsg("Enregistré.");
+    } catch {
+      setPriceMsg("Les prix n'ont pas pu être enregistrés. Réessaie.");
+    }
+  }
+
+  async function setEdition(e: Edition) {
+    if (game.edition === e) return;
+    if (notConfigured) onUpdate(await updateGame(game.id, { edition: e }).catch(() => ({ ...game, edition: e })));
+    else void run({ edition: e });
+  }
 
   async function run(next: Partial<Pick<Game, "condition" | "edition">> = {}) {
     if (isDemo) return;
@@ -79,18 +111,16 @@ export function MarketPanel({ game, onUpdate }: Props) {
             </button>
           ))}
         </div>
-        {showEdition && (
-          <div className="edition-ask">
-            <p className="small">Ce jeu existe en édition collector. Laquelle as-tu ?</p>
-            <div className="segmented small-seg" role="radiogroup" aria-label="Édition">
-              {(["standard", "collector"] as Edition[]).map((e) => (
-                <button key={e} role="radio" aria-checked={game.edition === e} className={game.edition === e ? "on" : ""} disabled={busy} onClick={() => game.edition !== e && void run({ edition: e })}>
-                  {e === "standard" ? "Classique" : "Collector"}
-                </button>
-              ))}
-            </div>
+        <div className="edition-ask">
+          {showEdition && <p className="small">Ce jeu existe en édition collector sur eBay. Laquelle as-tu ?</p>}
+          <div className="segmented small-seg" role="radiogroup" aria-label="Édition de ton exemplaire">
+            {(["standard", "collector"] as Edition[]).map((e) => (
+              <button key={e} role="radio" aria-checked={game.edition === e} className={game.edition === e ? "on" : ""} disabled={busy} onClick={() => void setEdition(e)}>
+                {e === "standard" ? "Édition classique" : "Collector"}
+              </button>
+            ))}
           </div>
-        )}
+        </div>
 
         {busy ? (
           <p className="value-line muted" role="status">
@@ -127,6 +157,46 @@ export function MarketPanel({ game, onUpdate }: Props) {
             {error}
           </p>
         )}
+
+        <form
+          className="my-prices"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void savePrices();
+          }}
+        >
+          <p className="small offer-head">Mes prix</p>
+          <div className="my-prices-row">
+            <label className="field">
+              <span className="field-label">Prix d'achat (€)</span>
+              <input id="price-paid" inputMode="decimal" value={paid} onChange={(e) => setPaid(e.target.value)} placeholder="ex. 24,90" autoComplete="off" />
+            </label>
+            <label className="field">
+              <span className="field-label">Ma cote (€)</span>
+              <input id="price-mine" inputMode="decimal" value={mine} onChange={(e) => setMine(e.target.value)} placeholder="facultatif" autoComplete="off" />
+            </label>
+          </div>
+          <p className="muted small">« Ma cote » remplace l'estimation dans le total de la collection. Vide = estimation automatique.</p>
+          {game.purchase_price != null && (game.manual_value ?? game.value_eur) != null && (
+            <p className="small gain">
+              {(() => {
+                const d = Number(game.manual_value ?? game.value_eur) - Number(game.purchase_price);
+                return d >= 0 ? `+ ${euros(d)} depuis l'achat` : `− ${euros(-d)} depuis l'achat`;
+              })()}
+            </p>
+          )}
+          <div className="my-prices-actions">
+            <button className="btn">Enregistrer</button>
+            <a className="text-btn" href={priceChartingUrl(game)} target="_blank" rel="noopener noreferrer">
+              Voir la cote sur PriceCharting
+            </a>
+          </div>
+          {priceMsg && (
+            <p className="small" role="status">
+              {priceMsg}
+            </p>
+          )}
+        </form>
       </section>
 
       <section className="photos market" aria-labelledby="buy-title">

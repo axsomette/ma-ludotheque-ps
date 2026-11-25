@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { collectionValue, euros, fetchMarket, MarketNotConfigured, MarketQuotaReached, valuePatch } from "../lib/market";
 import { updateGame } from "../lib/store";
+import { isDemo } from "../lib/supabase";
 import type { Game } from "../lib/types";
 import { DiscSpinner } from "./Logo";
 
@@ -17,7 +18,8 @@ export function CollectionValue({ games, onUpdated }: Props) {
   const [note, setNote] = useState<string | null>(null);
   const stop = useRef(false);
   const v = collectionValue(games);
-  const todo = games.filter((g) => !g.value_at || Date.now() - new Date(g.value_at).getTime() > WEEK);
+  // Jeux sans cote récente, hors ceux dont la cote est saisie à la main.
+  const todo = isDemo ? [] : games.filter((g) => g.manual_value == null && (!g.value_at || Date.now() - new Date(g.value_at).getTime() > WEEK));
 
   async function run() {
     stop.current = false;
@@ -68,8 +70,9 @@ export function CollectionValue({ games, onUpdated }: Props) {
             <span className="muted small">Valeur estimée de ta collection</span>
             <strong className="value-total-num">{v.valued ? euros(v.total) : "—"}</strong>
             <span className="muted small">
-              {v.valued ? `entre ${euros(v.low)} et ${euros(v.high)} · ` : ""}
-              {v.valued} / {v.count} jeux estimés · cotes eBay France
+              {v.valued && v.high > v.low ? `entre ${euros(v.low)} et ${euros(v.high)} · ` : ""}
+              {v.valued} / {v.count} jeux estimés
+              {v.spent > 0 ? ` · ${euros(v.spent)} dépensés` : ""}
             </span>
           </div>
           {todo.length > 0 && (

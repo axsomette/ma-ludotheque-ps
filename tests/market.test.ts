@@ -77,3 +77,27 @@ describe("offres et conversion eBay", () => {
     expect(fromEbay({ title: "x", price: { value: "10", currency: "USD" } })).toBeNull();
   });
 });
+
+import { collectionValue, gameValue, parseEuros } from "../src/lib/market";
+import { normalizeGame } from "../src/lib/types";
+
+describe("valeur de la collection", () => {
+  const g = (id: string, extra: object) => normalizeGame({ id, title: id, platform: "ps5", ...extra });
+  it("saisie des montants", () => {
+    expect(parseEuros("24,90")).toBe(24.9);
+    expect(parseEuros(" 12 € ")).toBe(12);
+    expect(parseEuros("")).toBeNull();
+    expect(parseEuros("abc")).toBeUndefined();
+    expect(parseEuros("-3")).toBeUndefined();
+  });
+  it("ma cote remplace l'estimation, total et dépenses", () => {
+    const games = [
+      g("a", { value_eur: 20, value_low: 15, value_high: 25, purchase_price: 60 }),
+      g("b", { value_eur: 30, value_low: 20, value_high: 40, manual_value: 50 }),
+      g("c", {}),
+    ];
+    expect(gameValue(games[1])).toBe(50);
+    const v = collectionValue(games);
+    expect(v).toMatchObject({ total: 70, low: 65, high: 75, valued: 2, count: 3, spent: 60 });
+  });
+});

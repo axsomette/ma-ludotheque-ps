@@ -195,7 +195,7 @@ export default function App() {
               )}
             </nav>
 
-            {!browsing && !isDemo && (
+            {!browsing && (
               <CollectionValue
                 games={games}
                 onUpdated={(updated) => setGames((list) => list.map((x) => (x.id === updated.id ? updated : x)))}
