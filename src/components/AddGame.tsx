@@ -296,6 +296,7 @@ export function AddGame({ onClose, onAdd, existing, onOpenExisting }: Props) {
                             {owned && <span className="r-owned">Déjà rangé</span>}
                           </span>
                           <span className="r-name">{c.name}</span>
+                          {c.local_name && <span className="r-alt">« {c.local_name} »</span>}
                           <span className="r-meta mono">{[c.year, c.pegi ? `PEGI ${c.pegi}` : null].filter(Boolean).join(" · ")}</span>
                         </button>
                       </li>

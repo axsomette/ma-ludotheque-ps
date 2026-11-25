@@ -88,6 +88,54 @@ async function underQuota(supabase: ReturnType<typeof createClient>, fn: string)
   return data === true;
 }
 
+// Types de jeu IGDB gardés : 0 jeu, 4 extension autonome, 8 remake, 9 remaster, 10 édition étendue, 11 portage.
+// Écartés : DLC, extension, bundle, mod, épisode, saison, fork, pack, mise à jour.
+const GAME_TYPES = "(0,4,8,9,10,11)";
+// Consoles PlayStation (PS1, PS2, PS3, PSP, Vita, PS4, PS5) pour la recherche élargie.
+const PLAYSTATIONS = "7,8,9,38,46,48,167";
+
+const words = (s: string) =>
+  s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+const same = (a: string, b: string) => words(a).join(" ") === words(b).join(" ");
+const contains = (name: string, q: string) => {
+  const have = new Set(words(name));
+  return words(q).every((w) => have.has(w));
+};
+
+/** Noms d'un jeu dans d'autres langues (noms alternatifs et localisés). */
+// deno-lint-ignore no-explicit-any
+function otherNames(g: any): Array<{ name: string; french: boolean }> {
+  return [
+    // deno-lint-ignore no-explicit-any
+    ...(g.alternative_names ?? []).map((a: any) => ({ name: String(a?.name ?? ""), french: /fran|french/i.test(String(a?.comment ?? "")) })),
+    // deno-lint-ignore no-explicit-any
+    ...(g.game_localizations ?? []).map((l: any) => ({ name: String(l?.name ?? ""), french: false })),
+  ].filter((n) => n.name && !same(n.name, g.name));
+}
+
+/** Nom à afficher sous le titre IGDB : celui qui correspond à la recherche, sinon le titre français. */
+// deno-lint-ignore no-explicit-any
+function localName(g: any, q: string): string | null {
+  if (contains(g.name, q)) return null;
+  const names = otherNames(g);
+  return (names.find((n) => contains(n.name, q)) ?? names.find((n) => n.french))?.name ?? null;
+}
+
+/** Sans doublon, le titre exact (anglais ou français) d'abord, puis l'ordre de pertinence d'IGDB. */
+// deno-lint-ignore no-explicit-any
+function rankGames(list: any[], q: string): any[] {
+  // deno-lint-ignore no-explicit-any
+  const unique = list.filter((g, i) => g.cover?.image_id && list.findIndex((x: any) => x.id === g.id) === i);
+  // deno-lint-ignore no-explicit-any
+  const score = (g: any) => {
+    const names = [g.name, ...otherNames(g).map((n) => n.name)];
+    if (names.some((n) => same(n, q))) return 0;
+    if (names.some((n) => contains(n, q))) return 1;
+    return 2;
+  };
+  return unique.map((g, i) => ({ g, i, s: score(g) })).sort((a, b) => a.s - b.s || a.i - b.i).map((x) => x.g);
+}
+
 const PEGI_WORDS: Record<string, number> = { three: 3, seven: 7, twelve: 12, sixteen: 16, eighteen: 18 };
 const PEGI_LEGACY: Record<number, number> = { 1: 3, 2: 7, 3: 12, 4: 16, 5: 18 };
 
@@ -154,17 +202,48 @@ Deno.serve(async (req) => {
 
     const fields =
       "fields name,cover.image_id,first_release_date,summary,genres.name,screenshots.image_id," +
-      "involved_companies.publisher,involved_companies.company.name;";
-    let games = await igdb(`search "${q}"; ${fields} where platforms = (${pid}) & cover != null; limit 12;`);
-    // Rien sur cette plateforme (titre mal lu, portage…) : on élargit à toutes les plateformes.
-    if (games.length === 0) games = await igdb(`search "${q}"; ${fields} where cover != null; limit 12;`);
-    games = games.filter((g) => g.cover?.image_id);
+      "involved_companies.publisher,involved_companies.company.name," +
+      "alternative_names.name,alternative_names.comment,game_localizations.name;";
+
+    // Recherche IGDB limitée aux vrais jeux : pas de DLC, mod, épisode, pack ni mise à jour.
+    // Si le filtre est refusé (schéma IGDB changé), on cherche sans lui plutôt que d'échouer.
+    // deno-lint-ignore no-explicit-any
+    async function search(where: string): Promise<any[]> {
+      try {
+        return await igdb(`search "${q}"; ${fields} where ${where} & game_type = ${GAME_TYPES}; limit 12;`);
+      } catch (e) {
+        console.warn("Filtre game_type ignoré :", (e as Error).message);
+        return await igdb(`search "${q}"; ${fields} where ${where}; limit 12;`);
+      }
+    }
+    // Titres français (et autres langues) : noms alternatifs et localisés d'IGDB, que « search » ne couvre pas toujours.
+    // deno-lint-ignore no-explicit-any
+    async function byLocalName(where: string): Promise<any[]> {
+      try {
+        return await igdb(
+          `${fields} where (alternative_names.name ~ *"${q}"* | game_localizations.name ~ *"${q}"*) & ${where} & game_type = ${GAME_TYPES}; limit 12;`,
+        );
+      } catch (e) {
+        console.warn("Recherche par nom local ignorée :", (e as Error).message);
+        return [];
+      }
+    }
+
+    const onPlatform = `platforms = (${pid}) & cover != null`;
+    let [found, local] = await Promise.all([search(onPlatform), byLocalName(onPlatform)]);
+    // Rien sur cette plateforme (titre mal lu, portage…) : on élargit aux autres consoles PlayStation.
+    if (found.length + local.length === 0) {
+      const wider = `platforms = (${PLAYSTATIONS}) & cover != null`;
+      [found, local] = await Promise.all([search(wider), byLocalName(wider)]);
+    }
+    const games = rankGames([...found, ...local], q).slice(0, 12);
 
     const pegi = await pegiFor(games.map((g) => g.id));
 
     const results = games.map((g) => ({
       igdb_id: g.id,
       name: g.name,
+      local_name: localName(g, q),
       year: g.first_release_date ? new Date(g.first_release_date * 1000).getUTCFullYear() : null,
       image_id: g.cover.image_id,
       thumb_url: `https://images.igdb.com/igdb/image/upload/t_cover_big/${g.cover.image_id}.jpg`,

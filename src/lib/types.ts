@@ -32,6 +32,8 @@ export type GamePatch = Partial<
 export interface CoverCandidate {
   igdb_id: number | null;
   name: string;
+  /** Autre nom du jeu (titre français…) quand c'est lui qui correspond à la recherche. */
+  local_name?: string | null;
   year: number | null;
   /** Petite image pour la liste de choix. */
   thumb_url: string;
