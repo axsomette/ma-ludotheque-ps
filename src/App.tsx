@@ -11,6 +11,7 @@ import { generatedCover } from "./lib/canvasArt";
 import { mix } from "./lib/artUtils";
 import { PLATFORMS, PLATFORM_ORDER } from "./lib/platforms";
 import { fetchScans } from "./lib/covers";
+import { activeLoans } from "./lib/loans";
 import { addGame, deleteGame, listGames, updateGame } from "./lib/store";
 import { isDemo, supabase } from "./lib/supabase";
 import type { Game, NewGame, Platform } from "./lib/types";
@@ -48,7 +49,7 @@ export default function App() {
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<Platform | "all">("all");
+  const [filter, setFilter] = useState<Platform | "all" | "loaned">("all");
   const [q, setQ] = useState("");
   // Raccourci de l'icône d'appli (« Ranger un jeu ») : ?ajouter=1 ouvre directement l'ajout.
   const [adding, setAdding] = useState(() => new URLSearchParams(window.location.search).has("ajouter"));
@@ -104,10 +105,13 @@ export default function App() {
     return c;
   }, [games]);
 
+  const loans = useMemo(() => activeLoans(games), [games]);
+
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return games.filter((g) => (filter === "all" || g.platform === filter) && (!needle || g.title.toLowerCase().includes(needle)));
-  }, [games, filter, q]);
+    const base = filter === "loaned" ? loans : games.filter((g) => filter === "all" || g.platform === filter);
+    return base.filter((g) => !needle || g.title.toLowerCase().includes(needle));
+  }, [games, loans, filter, q]);
 
   const selected = useMemo(() => games.find((g) => g.id === selectedId) ?? games[0] ?? null, [games, selectedId]);
   const tint = useTint(selected);
@@ -182,6 +186,12 @@ export default function App() {
                   <span className="mono">{f === "all" ? games.length : counts[f]}</span>
                 </button>
               ))}
+              {(loans.length > 0 || filter === "loaned") && (
+                <button aria-pressed={filter === "loaned"} className={filter === "loaned" ? "on" : ""} onClick={() => setFilter("loaned")}>
+                  Prêtés
+                  <span className="mono">{loans.length}</span>
+                </button>
+              )}
             </nav>
 
             {!browsing && !isDemo && (
@@ -197,7 +207,15 @@ export default function App() {
             {browsing ? (
               shown.length === 0 ? (
                 <div className="state-msg">
-                  <p>{q.trim() ? `Aucun jeu ne contient « ${q.trim()} »${filter !== "all" ? ` sur ${PLATFORMS[filter].label}` : ""}.` : `Aucun jeu ${PLATFORMS[filter as Platform].label} pour l'instant.`}</p>
+                  <p>
+                    {filter === "loaned"
+                      ? q.trim()
+                        ? `Aucun jeu prêté ne contient « ${q.trim()} ».`
+                        : "Aucun jeu prêté : toute ta collection est à la maison."
+                      : q.trim()
+                        ? `Aucun jeu ne contient « ${q.trim()} »${filter !== "all" ? ` sur ${PLATFORMS[filter].label}` : ""}.`
+                        : `Aucun jeu ${PLATFORMS[filter as Platform].label} pour l'instant.`}
+                  </p>
                   <button
                     className="btn"
                     onClick={() => {

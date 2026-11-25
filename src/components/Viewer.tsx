@@ -7,6 +7,7 @@ import { coverSrc } from "./Library";
 import { fetchDetails, fetchScans, needsDetails, ScansUnavailable, uploadPhoto, type PhotoKind } from "../lib/covers";
 import { isDemo } from "../lib/supabase";
 import { PLATFORMS } from "../lib/platforms";
+import { frenchDate, isLoaned, since, today } from "../lib/loans";
 import { pruneFiles, updateGame } from "../lib/store";
 import type { Game } from "../lib/types";
 import { GameCase3D, type CaseMode } from "./GameCase3D";
@@ -50,7 +51,8 @@ export function Viewer({ game, initialMode = "front", onClose, onDelete, onUpdat
   const [mode, setMode] = useState<CaseMode>(initialMode);
   const [flipped, setFlipped] = useState(false);
   const [tint, setTint] = useState("#2a3558");
-  const [busy, setBusy] = useState<PhotoKind | "delete" | "details" | "scans" | null>(null);
+  const [busy, setBusy] = useState<PhotoKind | "delete" | "details" | "scans" | "loan" | null>(null);
+  const [borrower, setBorrower] = useState("");
   const [scanNote, setScanNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [moreSummary, setMoreSummary] = useState(false);
@@ -118,6 +120,21 @@ export function Viewer({ game, initialMode = "front", onClose, onDelete, onUpdat
       onUpdate(await updateGame(game.id, patch));
     } catch (e) {
       setError((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /** Prête le jeu (nom saisi) ou le marque comme rendu (null). */
+  async function setLoan(to: string | null) {
+    setBusy("loan");
+    setError(null);
+    try {
+      const updated = await updateGame(game.id, { loaned_to: to, loaned_at: to ? today() : null });
+      onUpdate(updated);
+      setBorrower("");
+    } catch {
+      setError("Le prêt n'a pas pu être enregistré. Réessaie.");
     } finally {
       setBusy(null);
     }
@@ -242,6 +259,45 @@ export function Viewer({ game, initialMode = "front", onClose, onDelete, onUpdat
             )}
           </div>
         )}
+
+        <section className={`photos loan ${isLoaned(game) ? "is-out" : ""}`} aria-labelledby="loan-title">
+          <h3 id="loan-title">Prêt</h3>
+          {isLoaned(game) ? (
+            <>
+              <p className="loan-who">
+                Prêté à <strong>{game.loaned_to}</strong>
+                {game.loaned_at && (
+                  <span className="muted">
+                    {" "}
+                    · {since(game.loaned_at)}
+                    {since(game.loaned_at).startsWith("depuis") ? ` (${frenchDate(game.loaned_at)})` : ""}
+                  </span>
+                )}
+              </p>
+              <button className="btn" onClick={() => void setLoan(null)} disabled={busy !== null}>
+                {busy === "loan" ? <DiscSpinner size={20} /> : <IconCase />}
+                Il me l'a rendu
+              </button>
+            </>
+          ) : (
+            <form
+              className="loan-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (borrower.trim()) void setLoan(borrower.trim().slice(0, 80));
+              }}
+            >
+              <label className="field">
+                <span className="field-label">Prêter à</span>
+                <input id="loan-to" value={borrower} onChange={(e) => setBorrower(e.target.value)} placeholder="Thomas" maxLength={80} autoComplete="off" enterKeyHint="done" />
+              </label>
+              <button className="btn" disabled={!borrower.trim() || busy !== null}>
+                {busy === "loan" ? <DiscSpinner size={20} /> : <IconOpen />}
+                Prêter
+              </button>
+            </form>
+          )}
+        </section>
 
         <section className="photos" aria-labelledby="photos-title">
           <h3 id="photos-title">Vrai dos, vrai disque</h3>

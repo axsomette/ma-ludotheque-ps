@@ -20,12 +20,16 @@ export interface Game {
   back_url: string | null;
   /** Photo du vrai disque, si l'utilisateur l'a prise. */
   disc_url: string | null;
+  /** Personne à qui le jeu est prêté (null : le jeu est à la maison). */
+  loaned_to: string | null;
+  /** Date du prêt, AAAA-MM-JJ. */
+  loaned_at: string | null;
   created_at: string;
 }
 
-export type NewGame = Omit<Game, "id" | "created_at">;
+export type NewGame = Omit<Game, "id" | "created_at" | "loaned_to" | "loaned_at"> & Partial<Pick<Game, "loaned_to" | "loaned_at">>;
 export type GamePatch = Partial<
-  Pick<Game, "back_url" | "disc_url" | "title" | "summary" | "publisher" | "genres" | "pegi" | "screenshots" | "release_year">
+  Pick<Game, "back_url" | "disc_url" | "title" | "summary" | "publisher" | "genres" | "pegi" | "screenshots" | "release_year" | "loaned_to" | "loaned_at">
 >;
 
 /** Un résultat de recherche de jaquette. */
@@ -47,7 +51,7 @@ export interface CoverCandidate {
 }
 
 export const GAME_COLUMNS =
-  "id,title,platform,igdb_id,cover_url,release_year,summary,publisher,genres,pegi,screenshots,back_url,disc_url,created_at";
+  "id,title,platform,igdb_id,cover_url,release_year,summary,publisher,genres,pegi,screenshots,back_url,disc_url,loaned_to,loaned_at,created_at";
 
 /** Complète un jeu ancien (ou de la démo) avec les champs ajoutés depuis. */
 export function normalizeGame(g: Partial<Game> & Pick<Game, "id" | "title" | "platform">): Game {
@@ -60,6 +64,8 @@ export function normalizeGame(g: Partial<Game> & Pick<Game, "id" | "title" | "pl
     pegi: null,
     back_url: null,
     disc_url: null,
+    loaned_to: null,
+    loaned_at: null,
     created_at: new Date(0).toISOString(),
     ...g,
     genres: g.genres ?? [],

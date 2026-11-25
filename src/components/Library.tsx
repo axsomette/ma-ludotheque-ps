@@ -5,6 +5,7 @@ import { PLATFORMS } from "../lib/platforms";
 import type { Game } from "../lib/types";
 import type { CaseMode } from "./GameCase3D";
 import { IconChevron, IconDisc, IconPlus } from "./icons";
+import { isLoaned, loanLine } from "../lib/loans";
 
 export type OpenGame = (g: Game, mode?: CaseMode) => void;
 
@@ -65,6 +66,7 @@ export function Hero({ game, onOpen }: { game: Game; onOpen: OpenGame }) {
           {game.title}
         </h2>
         <p className="hero-meta mono">{metaLine([game.release_year, game.pegi ? `PEGI ${game.pegi}` : null, game.publisher])}</p>
+        {isLoaned(game) && <p className="hero-loan">{loanLine(game)}</p>}
         {game.genres.length > 0 && <p className="hero-genres">{game.genres.join(" · ")}</p>}
         {game.summary && (
           <p className="hero-summary" lang="en">
@@ -95,17 +97,19 @@ interface TileProps {
 /** Un boîtier dans une rangée. Survol ou focus = sélection (le fond change) ; clic = on le prend en main. */
 export function CaseTile({ game, onOpen, onSelect, selected }: TileProps) {
   const p = PLATFORMS[game.platform];
+  const loaned = isLoaned(game);
   return (
     <button
-      className={`tile ${selected ? "is-selected" : ""}`}
+      className={`tile ${selected ? "is-selected" : ""} ${loaned ? "is-loaned" : ""}`}
       onClick={() => onOpen(game)}
       onFocus={() => onSelect(game)}
       onPointerEnter={(e) => e.pointerType === "mouse" && onSelect(game)}
-      aria-label={`${game.title}, ${p.label}${game.release_year ? `, ${game.release_year}` : ""}`}
+      aria-label={`${game.title}, ${p.label}${game.release_year ? `, ${game.release_year}` : ""}${loaned ? `, prêté à ${game.loaned_to}` : ""}`}
       style={{ ["--case" as string]: p.caseColor }}
     >
       <span className="tile-case">
         <img src={coverSrc(game)} alt="" loading="lazy" crossOrigin="anonymous" />
+        {loaned && <span className="tile-loan">Chez {game.loaned_to}</span>}
       </span>
       <span className="tile-title">{game.title}</span>
       <span className="tile-meta mono">
