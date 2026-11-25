@@ -1,0 +1,39 @@
+name: Réveil Supabase
+
+# Le plan gratuit de Supabase met en pause un projet resté 7 jours sans activité.
+# Deux fois par semaine, une petite requête en lecture sur la base le garde actif.
+# Elle passe par la clé publique de l'appli (variables du dépôt, déjà utilisées par le déploiement) :
+# les règles RLS renvoient une liste vide, aucune donnée n'est lue ni modifiée.
+# Si le projet est déjà en pause, la tâche échoue et GitHub prévient par e-mail.
+# Note : GitHub désactive les tâches planifiées d'un dépôt sans commit depuis 60 jours (il prévient avant).
+
+on:
+  schedule:
+    - cron: "17 6 * * 1,4" # lundi et jeudi, 6 h 17 UTC
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Requête sur la base
+        env:
+          SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          SUPABASE_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
+            echo "::error::Variables VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY absentes du dépôt."
+            exit 1
+          fi
+          code=$(curl -sS -o /tmp/reponse.json -w "%{http_code}" --retry 3 --retry-delay 10 \
+            -H "apikey: $SUPABASE_KEY" \
+            "$SUPABASE_URL/rest/v1/games?select=id&limit=1")
+          echo "Réponse HTTP $code"
+          if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
+            cat /tmp/reponse.json
+            echo "::error::Supabase ne répond pas (HTTP $code). Le projet est peut-être en pause : relance-le depuis le tableau de bord."
+            exit 1
+          fi
