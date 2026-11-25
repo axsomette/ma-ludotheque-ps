@@ -1,6 +1,6 @@
 // Lecture des pages LaunchBox Games DB (extraits réduits de vraies pages, novembre 2026).
 import { describe, expect, it } from "vitest";
-import { parseImages, parseResults, pickImage, pickResult, safeImageUrl } from "../supabase/functions/fetch-scans/launchbox";
+import { parseImages, parseResults, pickImage, pickResult, safeImageUrl, searchTerms } from "../supabase/functions/fetch-scans/launchbox";
 
 const card = (id: string, slug: string, title: string, platform: string) => `
   <div b-x class="games-grid-card col-xl-3">
@@ -76,5 +76,39 @@ describe("LaunchBox : images d'un jeu", () => {
     expect(safeImageUrl("http://images.launchbox-app.com/x.jpg")).toBeNull();
     expect(safeImageUrl("https://evil.example/x.jpg")).toBeNull();
     expect(safeImageUrl("https://images.launchbox-app.com.evil.example/x.jpg")).toBeNull();
+  });
+});
+
+describe("LaunchBox : titres qui diffèrent d'IGDB", () => {
+  const R = parseResults(
+    card("1", "rdr2-pc", "Red Dead Redemption 2", "Windows") +
+      card("2", "rdr2", "Red Dead Redemption II", "Sony Playstation 4") +
+      card("3", "rdr", "Red Dead Redemption", "Sony Playstation 4") +
+      card("4", "ff7r", "Final Fantasy VII Remake: Rebirth", "Sony Playstation 5") +
+      card("5", "mgs", "Metal Gear Solid &#x394;: Snake Eater", "Sony Playstation 5"),
+  );
+  it("chiffres romains = chiffres arabes", () => {
+    expect(pickResult(R, "Red Dead Redemption 2", "ps4")?.id).toBe("2");
+  });
+  it("titre LaunchBox avec un mot en plus", () => {
+    expect(pickResult(R, "Final Fantasy VII Rebirth", "ps5")?.id).toBe("4");
+  });
+  it("lit les entités HTML numériques et « Δ » comme « Delta »", () => {
+    expect(R.find((r) => r.id === "5")?.title).toBe("Metal Gear Solid Δ: Snake Eater");
+    expect(pickResult(R, "Metal Gear Solid Delta: Snake Eater", "ps5")?.id).toBe("5");
+  });
+  it("ne confond pas un jeu avec sa suite", () => {
+    expect(pickResult(R, "Red Dead Redemption", "ps4")?.id).toBe("3");
+  });
+});
+
+describe("LaunchBox : termes de recherche", () => {
+  it("retire la mention d'édition", () => {
+    expect(searchTerms("Shadow Gambit: The Cursed Crew – Complete Edition")).toEqual([
+      "Shadow Gambit: The Cursed Crew – Complete Edition",
+      "Shadow Gambit: The Cursed Crew",
+    ]);
+    expect(searchTerms("Crimson Desert Enhanced")).toEqual(["Crimson Desert Enhanced", "Crimson Desert"]);
+    expect(searchTerms("Astro Bot")).toEqual(["Astro Bot"]);
   });
 });

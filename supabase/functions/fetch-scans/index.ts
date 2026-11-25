@@ -1,7 +1,7 @@
 // Va chercher sur LaunchBox Games DB les vrais scans d'un jeu (dos du boîtier et sérigraphie du disque),
 // version européenne en priorité, et les copie dans covers/<user_id>/. Aucun compte ni clé nécessaire.
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { LB_PLATFORM, parseImages, parseResults, pickImage, pickResult, safeImageUrl, type Platform } from "./launchbox.ts";
+import { LB_PLATFORM, parseImages, parseResults, pickResult, rankImages, safeImageUrl, searchTerms, type LbImage, type LbResult, type Platform } from "./launchbox.ts";
 
 // --- CORS et réponses JSON ---
 
@@ -92,40 +92,65 @@ Deno.serve(async (req) => {
     if (typeof title !== "string" || !title.trim() || title.length > 120) return json(req, { error: "Titre invalide" }, 400);
     if (typeof platform !== "string" || !Object.hasOwn(LB_PLATFORM, platform)) return json(req, { error: "Plateforme invalide" }, 400);
 
-    const results = parseResults(await page(`/games/results/${encodeURIComponent(title.trim())}`));
-    const game = pickResult(results, title, platform as Platform);
+    // Titre tel quel, puis sans sa mention d'édition (« – Complete Edition », « Enhanced »…).
+    let game: LbResult | null = null;
+    for (const term of searchTerms(title)) {
+      game = pickResult(parseResults(await page(`/games/results/${encodeURIComponent(term)}`)), term, platform as Platform);
+      if (game) break;
+    }
     if (!game) return json(req, { found: false, back_url: null, disc_url: null });
     const images = parseImages(await page(`/games/images/${game.id}`));
 
-    async function copy(url: string | undefined, kind: "back" | "disc", minBytes: number): Promise<string | null> {
-      const safe = url ? safeImageUrl(url) : null;
+    /** Télécharge un scan ; null s'il est absent, refusé, raté (trop léger) ou trop lourd pour le stockage. */
+    async function download(url: string, minBytes: number): Promise<{ bytes: Uint8Array; type: string } | null> {
+      const safe = safeImageUrl(url);
       if (!safe) return null;
       const img = await fetch(safe, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(15000), redirect: "error" });
       const type = img.headers.get("content-type") ?? "";
-      if (!img.ok || !type.startsWith("image/")) return null;
+      if (!img.ok || !type.startsWith("image/") || Number(img.headers.get("content-length") ?? 0) > MAX_BYTES) {
+        await img.body?.cancel();
+        return null;
+      }
       const bytes = new Uint8Array(await img.arrayBuffer());
-      if (bytes.byteLength < minBytes || bytes.byteLength > MAX_BYTES) return null; // scan raté ou trop lourd
+      if (bytes.byteLength < minBytes || bytes.byteLength > MAX_BYTES) return null;
+      return { bytes, type };
+    }
+
+    /** Premier scan utilisable, dans l'ordre des régions (un scan européen trop lourd laisse sa place au suivant). */
+    async function copy(candidates: LbImage[], kind: "back" | "disc", minBytes: number): Promise<{ url: string; region: string | null } | null> {
+      let got: { bytes: Uint8Array; type: string } | null = null;
+      let chosen: LbImage | null = null;
+      for (const c of candidates.slice(0, 4)) {
+        got = await download(c.url, minBytes).catch(() => null);
+        if (got) {
+          chosen = c;
+          break;
+        }
+      }
+      if (!got || !chosen) return null;
+      const { bytes, type } = got;
       const ext = type.includes("png") ? "png" : type.includes("webp") ? "webp" : "jpg";
       const path = `${uid}/lb-${kind}-${game!.id}.${ext}`;
       const { error } = await supabase.storage.from("covers").upload(path, bytes, { contentType: type, upsert: true });
       if (error) throw error;
-      return supabase.storage.from("covers").getPublicUrl(path).data.publicUrl;
+      return { url: supabase.storage.from("covers").getPublicUrl(path).data.publicUrl, region: chosen.region };
     }
 
-    const backImg = pickImage(images, "Box - Back");
-    const discImg = pickImage(images, "Disc");
     const [back, disc] = await Promise.allSettled([
-      copy(backImg?.url, "back", 20 * 1024), // en dessous de 20 Ko, le scan est inexploitable
-      copy(discImg?.url, "disc", 4 * 1024),
+      copy(rankImages(images, "Box - Back"), "back", 20 * 1024), // en dessous de 20 Ko, le scan est inexploitable
+      copy(rankImages(images, "Disc"), "disc", 4 * 1024),
     ]);
+    for (const r of [back, disc]) if (r.status === "rejected") console.error(r.reason);
+    const b = back.status === "fulfilled" ? back.value : null;
+    const d = disc.status === "fulfilled" ? disc.value : null;
     return json(req, {
       found: true,
       lb_id: game.id,
       name: game.title,
-      back_region: backImg?.region ?? null,
-      disc_region: discImg?.region ?? null,
-      back_url: back.status === "fulfilled" ? back.value : null,
-      disc_url: disc.status === "fulfilled" ? disc.value : null,
+      back_region: b?.region ?? null,
+      disc_region: d?.region ?? null,
+      back_url: b?.url ?? null,
+      disc_url: d?.url ?? null,
     });
   } catch (e) {
     console.error(e); // le détail reste dans les journaux, jamais dans la réponse
