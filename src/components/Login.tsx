@@ -114,7 +114,7 @@ export function Login({ recovery = false, onRecovered }: { recovery?: boolean; o
       <div className="login-card">
         <Logo size={72} />
         <h1 className="wordmark big">Ludothèque</h1>
-        <p className="muted">Tes jeux PS5, PS4 et PS3 en boîtiers 3D, dans ta poche. Prends un boîtier, ouvre-le, sors le disque.</p>
+        <p className="muted">Tes jeux PlayStation, Nintendo Switch et Xbox en boîtiers 3D, dans ta poche. Prends un boîtier, ouvre-le, sors le disque ou la cartouche.</p>
 
         {!recovery && mode !== "forgot" && (
           <div className="segmented" role="tablist" aria-label="Connexion ou inscription">

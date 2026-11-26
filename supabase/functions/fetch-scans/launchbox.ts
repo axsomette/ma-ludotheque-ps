@@ -1,13 +1,10 @@
 // Lecture des pages publiques de LaunchBox Games DB (gamesdb.launchbox-app.com), sans compte ni clé.
 // Module pur (aucune dépendance) : testé avec Vitest, inclus tel quel dans la fonction fetch-scans.
 
-export type Platform = "ps3" | "ps4" | "ps5";
+import { LAUNCHBOX, type Platform } from "../_shared/platforms.ts";
+export type { Platform };
 
-export const LB_PLATFORM: Record<Platform, string> = {
-  ps5: "Sony Playstation 5",
-  ps4: "Sony Playstation 4",
-  ps3: "Sony Playstation 3",
-};
+export const LB_PLATFORM: Record<Platform, string> = LAUNCHBOX;
 
 /** Ordre de préférence des régions : versions européennes d'abord. */
 export const LB_REGIONS = ["France", "Europe", "United Kingdom", "Germany", "Spain", "Italy", "World", "North America", "Japan"];

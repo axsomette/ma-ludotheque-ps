@@ -49,7 +49,7 @@ async function underQuota(supabase: ReturnType<typeof createClient>, fn: string)
 
 import { bestOffers, collectorExists, estimate, fromEbay, matches, type Condition, type Edition, type Listing, type Platform } from "./market.ts";
 
-const PLATFORM_LABEL: Record<Platform, string> = { ps5: "PS5", ps4: "PS4", ps3: "PS3" };
+import { LABEL as PLATFORM_LABEL } from "../_shared/platforms.ts";
 const EBAY = "https://api.ebay.com";
 
 let token: { value: string; expires: number } | null = null;

@@ -5,7 +5,8 @@
 // (lots, consoles, boîtiers vides, codes…), les prix aberrants, puis on prend un prix « bas de marché »
 // (40e centile) plutôt que la moyenne, plus proche de ce qu'un jeu se vend vraiment.
 
-export type Platform = "ps3" | "ps4" | "ps5";
+import { PLATFORM_RE, type Platform } from "../_shared/platforms.ts";
+export type { Platform };
 export type Condition = "loose" | "cib" | "new";
 export type Edition = "standard" | "collector";
 
@@ -49,15 +50,10 @@ export function words(s: string): string[] {
     .map((w) => ROMAN[w] ?? w);
 }
 
-const PLATFORM_RE: Record<Platform, RegExp> = {
-  ps5: /\b(ps ?5|playstation ?5)\b/i,
-  ps4: /\b(ps ?4|playstation ?4)\b/i,
-  ps3: /\b(ps ?3|playstation ?3)\b/i,
-};
 
 // Annonces qui ne sont pas « le jeu seul » : lots, consoles, accessoires, boîtiers vides, codes, guides…
 const JUNK =
-  /\b(lot|lots|bundle|pack|console|manette|controller|casque|volant|pedales|pedalier|boitier vide|boite vide|jaquette seule|sans (le )?jeu|notice seule|steelbook seul|code|psn|dlc|digital|dematerialise|cle|key|guide|soluce|artbook|figurine seule|poster|affiche|carte|pass|season|abonnement|ps plus|reparation|hs)\b/i;
+  /\b(lot|lots|bundle|pack|console|manette|controller|casque|volant|pedales|pedalier|boitier vide|boite vide|jaquette seule|sans (le )?jeu|notice seule|steelbook seul|code|psn|eshop|xbox live|game pass|dlc|digital|dematerialise|cle|key|guide|soluce|artbook|figurine seule|poster|affiche|carte|pass|season|abonnement|ps plus|reparation|hs)\b/i;
 const COLLECTOR = /\b(collector|collectors|collector's|edition collector|limited|limitee|edition limitee|steelbook)\b/i;
 const LOOSE = /\b(sans boite|sans boitier|disque seul|cd seul|loose|sans jaquette)\b/i;
 
@@ -82,7 +78,9 @@ export function matches(l: Pick<Listing, "title">, title: string, platform: Plat
   if (!requiredWords(title).every((w) => have.has(w))) return false;
   // Suite numérotée absente du titre cherché (« Red Dead Redemption 2 » pour « Red Dead Redemption ») : écartée.
   const want = new Set(words(title));
-  const next = words(l.title).find((w) => /^\d{1,2}$/.test(w) && !want.has(w) && Number(w) > 1 && Number(w) < 20 && !["3", "4", "5"].includes(w));
+  // La console est d'abord retirée du titre : le « 2 » de « Switch 2 » ou le « 4 » de « PS 4 » n'est pas une suite.
+  const noConsole = Object.values(PLATFORM_RE).reduce((acc, re) => acc.replace(new RegExp(re.source, "gi"), " "), l.title);
+  const next = words(noConsole).find((w) => /^\d{1,2}$/.test(w) && !want.has(w) && Number(w) > 1 && Number(w) < 20);
   if (next) return false;
   const isCollector = COLLECTOR.test(t);
   return edition === "collector" ? isCollector : !isCollector;

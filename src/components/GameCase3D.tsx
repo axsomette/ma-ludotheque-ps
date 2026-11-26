@@ -2,20 +2,22 @@ import { useGLTF, useTexture } from "@react-three/drei";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { backCover, discDataSide, discLabel, fontsReady, frontCover, generatedCover, spineTexture } from "../lib/canvasArt";
+import { backCover, cartLabel, discDataSide, discLabel, fontsReady, frontCover, generatedCover, spineTexture } from "../lib/canvasArt";
 import { PLATFORMS } from "../lib/platforms";
 import type { Game, Platform } from "../lib/types";
 
-// Boîtier Blu-ray PlayStation : 135 × 171 × 15 mm (1 unité = 100 mm).
-const W = 1.35;
-const H = 1.71;
-const D = 0.15;
+// Dimensions du modèle Blender (boîtier PlayStation, 135 × 171 × 15 mm) ; les autres consoles le mettent à l'échelle.
+const W0 = 1.35;
+const H0 = 1.71;
+const D0 = 0.15;
 const T = 0.016; // épaisseur du plastique
+// Cartouche Switch : 31 × 21 × 3,3 mm, posée dans son logement en haut à droite du boîtier.
+const CART = { w: 0.21, h: 0.31, d: 0.033 };
 const OPEN_ANGLE = -2.75; // ≈ 158°, presque à plat comme un vrai boîtier
 const DISC_R = 0.6; // disque de 120 mm
 const HOLE_R = 0.075;
 const DISC_T = 0.012;
-const DISC_REST_Z = -D / 2 + T + 0.02 + DISC_T / 2; // posé sur les pétales du moyeu
+const discRestZ = (D: number) => -D / 2 + T + 0.02 + DISC_T / 2; // posé sur les pétales du moyeu
 
 // Coque modélisée dans Blender (blender/build_case.py) : plateau « Base » et couvercle « Lid »
 // (origine sur la charnière), textures de plastique faites dans TextureLucraft.
@@ -92,6 +94,11 @@ export function GameCase3D({ game, mode, discFlipped, tint, onCaseClick, onDiscC
   cover.anisotropy = 8;
 
   const dataSide = useMemo(() => canvasTexture(discDataSide()), []);
+  const style = PLATFORMS[game.platform];
+  const { w: W, h: H, d: D } = style.size;
+  const isCart = style.media === "cart";
+  const shellScale: [number, number, number] = [W / W0, H / H0, D / D0];
+  const rest: [number, number, number] = isCart ? [W / 2 - 0.22, H / 2 - 0.36, -D / 2 + T + CART.d / 2 + 0.004] : [0, 0.04, discRestZ(D)];
 
   const [front, setFront] = useState<THREE.Texture | null>(null);
   const [back, setBack] = useState<THREE.Texture | null>(null);
@@ -101,7 +108,7 @@ export function GameCase3D({ game, mode, discFlipped, tint, onCaseClick, onDiscC
     let alive = true;
     frontCover(game).then((c) => alive && setFront(canvasTexture(c)));
     backCover(game, tint).then((c) => alive && setBack(canvasTexture(c)));
-    discLabel(game).then((c) => alive && setLabel(canvasTexture(c)));
+    (PLATFORMS[game.platform].media === "cart" ? cartLabel(game) : discLabel(game)).then((c) => alive && setLabel(canvasTexture(c)));
     // la tranche attend les logotypes officiels
     fontsReady().then(() => alive && setSpine(canvasTexture(spineTexture(game, tint))));
     return () => {
@@ -132,12 +139,13 @@ export function GameCase3D({ game, mode, discFlipped, tint, onCaseClick, onDiscC
 
     // Disque : posé dans le boîtier, ou sorti face à soi et tournant lentement.
     const d = disc.current;
-    d.position.x = k(d.position.x, out ? -0.12 : 0, 5);
-    d.position.y = k(d.position.y, out ? 0.12 + Math.sin(state.clock.elapsedTime * 1.4) * 0.025 : 0.04, 5);
-    d.position.z = k(d.position.z, out ? 1.25 : DISC_REST_Z, 5);
-    const s = k(d.scale.x, out ? 1.12 : 1, 5);
+    d.position.x = k(d.position.x, out ? -0.12 : rest[0], 5);
+    d.position.y = k(d.position.y, out ? 0.12 + Math.sin(state.clock.elapsedTime * 1.4) * 0.025 : rest[1], 5);
+    d.position.z = k(d.position.z, out ? 1.25 : rest[2], 5);
+    // La cartouche, minuscule, est agrandie une fois sortie pour qu'on lise son étiquette.
+    const s = k(d.scale.x, out ? (isCart ? 3.4 : 1.12) : 1, 5);
     d.scale.setScalar(s);
-    spin.current += dt * (out ? 0.35 : open ? 0.12 : 0);
+    if (!isCart) spin.current += dt * (out ? 0.35 : open ? 0.12 : 0);
     flip.current = k(flip.current, discFlipped && out ? Math.PI : 0, 6);
     d.rotation.set(out ? 0.12 : 0, flip.current, spin.current);
   });
@@ -166,7 +174,9 @@ export function GameCase3D({ game, mode, discFlipped, tint, onCaseClick, onDiscC
         {...hover}
       >
         {/* coque Blender : plateau, tranche à double charnière, moyeu à pétales, arcs de maintien */}
-        <primitive object={shell.base} />
+        <group scale={shellScale}>
+          <primitive object={shell.base} />
+        </group>
         {/* jaquette arrière, sous le film transparent */}
         <mesh position={[0, 0, -D / 2 - 0.0012]} rotation={[0, Math.PI, 0]}>
           <planeGeometry args={[W - 0.05, H - 0.05]} />
@@ -189,41 +199,56 @@ export function GameCase3D({ game, mode, discFlipped, tint, onCaseClick, onDiscC
         }}
         {...hover}
       >
+        {isCart ? (
+          // Cartouche : étiquette sur la face avant, plastique sombre ailleurs, encoche en haut.
+          <mesh castShadow>
+            <boxGeometry args={[CART.w, CART.h, CART.d]} />
+            <meshStandardMaterial attach="material-0" color="#26272b" roughness={0.6} />
+            <meshStandardMaterial attach="material-1" color="#26272b" roughness={0.6} />
+            <meshStandardMaterial attach="material-2" color="#2b2c31" roughness={0.6} />
+            <meshStandardMaterial attach="material-3" color="#26272b" roughness={0.6} />
+            <meshPhysicalMaterial attach="material-4" key={label ? label.uuid : "blank"} map={label ?? undefined} color={label ? "#ffffff" : "#d5d9e2"} roughness={0.35} clearcoat={0.5} />
+            <meshStandardMaterial attach="material-5" color="#1d1e22" roughness={0.7} />
+          </mesh>
+        ) : (
+          <>
         <mesh position={[0, 0, DISC_T / 2]} castShadow>
-          <ringGeometry args={[HOLE_R, DISC_R, 128, 1]} />
-          <meshPhysicalMaterial
-            key={label ? label.uuid : "blank"}
-            map={label ?? undefined}
-            color={label ? "#ffffff" : "#d5d9e2"}
-            roughness={0.42}
-            clearcoat={0.6}
-          />
-        </mesh>
-        <mesh position={[0, 0, -DISC_T / 2]} rotation={[0, Math.PI, 0]}>
-          <ringGeometry args={[HOLE_R, DISC_R, 128, 1]} />
-          {/* Peu métallique + légère émission de la texture : l'irisé reste visible sous tous les angles. */}
-          <meshPhysicalMaterial
-            map={dataSide}
-            emissiveMap={dataSide}
-            emissive="#ffffff"
-            emissiveIntensity={0.14}
-            metalness={0.45}
-            roughness={0.2}
-            iridescence={1}
-            iridescenceIOR={1.6}
-            iridescenceThicknessRange={[180, 620]}
-            clearcoat={1}
-            envMapIntensity={1.6}
-          />
-        </mesh>
-        <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[DISC_R, DISC_R, DISC_T, 128, 1, true]} />
-          <meshPhysicalMaterial color="#d9dee8" metalness={0.8} roughness={0.25} side={THREE.DoubleSide} />
-        </mesh>
-        <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[HOLE_R, HOLE_R, DISC_T, 48, 1, true]} />
-          <meshPhysicalMaterial color="#cfd5e0" roughness={0.2} transparent opacity={0.7} side={THREE.DoubleSide} />
-        </mesh>
+              <ringGeometry args={[HOLE_R, DISC_R, 128, 1]} />
+              <meshPhysicalMaterial
+                key={label ? label.uuid : "blank"}
+                map={label ?? undefined}
+                color={label ? "#ffffff" : "#d5d9e2"}
+                roughness={0.42}
+                clearcoat={0.6}
+              />
+            </mesh>
+            <mesh position={[0, 0, -DISC_T / 2]} rotation={[0, Math.PI, 0]}>
+              <ringGeometry args={[HOLE_R, DISC_R, 128, 1]} />
+              {/* Peu métallique + légère émission de la texture : l'irisé reste visible sous tous les angles. */}
+              <meshPhysicalMaterial
+                map={dataSide}
+                emissiveMap={dataSide}
+                emissive="#ffffff"
+                emissiveIntensity={0.14}
+                metalness={0.45}
+                roughness={0.2}
+                iridescence={1}
+                iridescenceIOR={1.6}
+                iridescenceThicknessRange={[180, 620]}
+                clearcoat={1}
+                envMapIntensity={1.6}
+              />
+            </mesh>
+            <mesh rotation={[Math.PI / 2, 0, 0]}>
+              <cylinderGeometry args={[DISC_R, DISC_R, DISC_T, 128, 1, true]} />
+              <meshPhysicalMaterial color="#d9dee8" metalness={0.8} roughness={0.25} side={THREE.DoubleSide} />
+            </mesh>
+            <mesh rotation={[Math.PI / 2, 0, 0]}>
+              <cylinderGeometry args={[HOLE_R, HOLE_R, DISC_T, 48, 1, true]} />
+              <meshPhysicalMaterial color="#cfd5e0" roughness={0.2} transparent opacity={0.7} side={THREE.DoubleSide} />
+            </mesh>
+          </>
+        )}
       </group>
 
       {/* ---------- Couvercle (pivote sur la tranche) ---------- */}
@@ -238,7 +263,9 @@ export function GameCase3D({ game, mode, discFlipped, tint, onCaseClick, onDiscC
         {...hover}
       >
         {/* coque Blender : couvercle, lèvre d'emboîtement, attaches à livret */}
-        <primitive object={shell.lid} />
+        <group scale={shellScale}>
+          <primitive object={shell.lid} />
+        </group>
         {/* jaquette avant sous le film transparent */}
         <mesh position={[W / 2 + 0.006, 0, T / 2 + 0.0012]}>
           <planeGeometry args={[W - 0.05, H - 0.05]} />

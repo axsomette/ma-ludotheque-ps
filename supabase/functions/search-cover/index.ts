@@ -1,4 +1,4 @@
-// Recherche de jeux dans la base IGDB (Twitch), filtrée par plateforme PlayStation.
+// Recherche de jeux dans la base IGDB (Twitch), filtrée par console (PlayStation, Nintendo, Xbox).
 // Renvoie la jaquette et de quoi composer un dos réaliste : résumé, éditeur, genres, captures, PEGI.
 // Les identifiants Twitch restent côté serveur (secrets Supabase), jamais dans le navigateur.
 // Réservée aux utilisateurs connectés (protège le quota IGDB) : la session est vérifiée ici,
@@ -43,7 +43,7 @@ function publicKey(): string {
 
 // --- IGDB ---
 
-const IGDB_PLATFORM: Record<string, number> = { ps3: 9, ps4: 48, ps5: 167 };
+import { FAMILY_IGDB, IGDB_ID, isPlatform } from "../_shared/platforms.ts";
 
 let token: { value: string; expires: number } | null = null;
 
@@ -91,8 +91,6 @@ async function underQuota(supabase: ReturnType<typeof createClient>, fn: string)
 // Types de jeu IGDB gardés : 0 jeu, 4 extension autonome, 8 remake, 9 remaster, 10 édition étendue, 11 portage.
 // Écartés : DLC, extension, bundle, mod, épisode, saison, fork, pack, mise à jour.
 const GAME_TYPES = "(0,4,8,9,10,11)";
-// Consoles PlayStation (PS1, PS2, PS3, PSP, Vita, PS4, PS5) pour la recherche élargie.
-const PLAYSTATIONS = "7,8,9,38,46,48,167";
 
 const words = (s: string) =>
   s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
@@ -219,8 +217,8 @@ Deno.serve(async (req) => {
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 80);
-    const pid = Object.hasOwn(IGDB_PLATFORM, String(platform)) ? IGDB_PLATFORM[String(platform)] : undefined;
-    if (!q || !pid) return json(req, { error: "query et platform (ps3|ps4|ps5) requis" }, 400);
+    const pid = isPlatform(platform) ? IGDB_ID[platform] : undefined;
+    if (!q || !pid) return json(req, { error: "query et platform requis" }, 400);
 
     const fields =
       "fields name,cover.image_id,first_release_date,summary,genres.name,screenshots.image_id," +
@@ -253,9 +251,9 @@ Deno.serve(async (req) => {
 
     const onPlatform = `platforms = (${pid}) & cover != null`;
     let [found, local] = await Promise.all([search(onPlatform), byLocalName(onPlatform)]);
-    // Rien sur cette plateforme (titre mal lu, portage…) : on élargit aux autres consoles PlayStation.
+    // Rien sur cette plateforme (titre mal lu, portage…) : on élargit aux autres consoles de la même famille.
     if (found.length + local.length === 0) {
-      const wider = `platforms = (${PLAYSTATIONS}) & cover != null`;
+      const wider = `platforms = (${FAMILY_IGDB[platform as keyof typeof FAMILY_IGDB].join(",")}) & cover != null`;
       [found, local] = await Promise.all([search(wider), byLocalName(wider)]);
     }
     const candidates = [...found, ...local];

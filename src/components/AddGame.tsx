@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { saveCover, searchCovers, uploadPhoto } from "../lib/covers";
 import { DuplicateGameError, duplicateMessage, findDuplicate, type GameKey } from "../lib/duplicates";
 import { readCover } from "../lib/ocr";
-import { PLATFORMS, PLATFORM_ORDER } from "../lib/platforms";
 import type { CoverCandidate, Game, NewGame, Platform } from "../lib/types";
 import { IconCamera, IconClose, IconSearch } from "./icons";
 import { DiscSpinner } from "./Logo";
+import { PlatformPicker } from "./PlatformPicker";
 
 interface Props {
   onClose: () => void;
@@ -192,7 +192,7 @@ export function AddGame({ onClose, onAdd, existing, onOpenExisting }: Props) {
             <button className="photo-drop" onClick={() => fileInput.current?.click()}>
               <IconCamera width={34} height={34} />
               <strong>Photographier la jaquette</strong>
-              <span className="muted">De face, avec le bandeau PS5, PS4 ou PS3 visible en haut.</span>
+              <span className="muted">De face, avec le bandeau de la console (PS5, Switch, Xbox…) visible en haut.</span>
             </button>
             <input ref={fileInput} type="file" accept="image/*" capture="environment" hidden onChange={(e) => e.target.files?.[0] && onPhoto(e.target.files[0])} />
             <button className="text-btn" onClick={() => setStep("search")}>
@@ -230,22 +230,14 @@ export function AddGame({ onClose, onAdd, existing, onOpenExisting }: Props) {
                 <span className="hide-sm">Chercher</span>
               </button>
             </form>
-            <div className="segmented" role="radiogroup" aria-label="Plateforme">
-              {PLATFORM_ORDER.map((pf) => (
-                <button
-                  key={pf}
-                  role="radio"
-                  aria-checked={platform === pf}
-                  className={platform === pf ? "on" : ""}
-                  onClick={() => {
-                    setPlatform(pf);
-                    if (query.trim()) void runSearch(query, pf);
-                  }}
-                >
-                  {PLATFORMS[pf].label}
-                </button>
-              ))}
-            </div>
+            <PlatformPicker
+              value={platform}
+              disabled={step === "saving"}
+              onChange={(pf) => {
+                setPlatform(pf);
+                if (query.trim()) void runSearch(query, pf);
+              }}
+            />
 
             {error && (
               <div className="error-row">

@@ -49,7 +49,7 @@ async function underQuota(supabase: ReturnType<typeof createClient>, fn: string)
 // --- LaunchBox ---
 
 const LB = "https://gamesdb.launchbox-app.com";
-const UA = "ma-ludotheque/1.0 (collection personnelle de jeux PlayStation)";
+const UA = "ma-ludotheque/1.0 (collection personnelle de jeux vidéo)";
 const MAX_BYTES = 5 * 1024 * 1024; // même plafond que le bucket « covers »
 
 /**
@@ -138,7 +138,8 @@ Deno.serve(async (req) => {
 
     const [back, disc] = await Promise.allSettled([
       copy(rankImages(images, "Box - Back"), "back", 20 * 1024), // en dessous de 20 Ko, le scan est inexploitable
-      copy(rankImages(images, "Disc"), "disc", 4 * 1024),
+      // Switch : la face de la cartouche tient lieu de disque.
+      copy([...rankImages(images, "Disc"), ...rankImages(images, "Cart - Front")], "disc", 4 * 1024),
     ]);
     for (const r of [back, disc]) if (r.status === "rejected") console.error(r.reason);
     const b = back.status === "fulfilled" ? back.value : null;

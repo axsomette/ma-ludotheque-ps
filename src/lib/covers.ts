@@ -120,8 +120,8 @@ export type PhotoKind = "front" | "back" | "disc";
  * Envoie une photo prise par l'utilisateur (jaquette, dos ou disque) dans son dossier du stockage.
  * Le disque est recadré en carré centré, le reste est simplement redimensionné.
  */
-export async function uploadPhoto(file: Blob, kind: PhotoKind): Promise<string> {
-  const jpeg = await toJpeg(file, kind === "disc");
+export async function uploadPhoto(file: Blob, kind: PhotoKind, square = kind === "disc"): Promise<string> {
+  const jpeg = await toJpeg(file, square);
   if (!supabase) return await blobToDataUrl(jpeg);
   const { data: auth } = await supabase.auth.getUser();
   const uid = auth.user?.id;

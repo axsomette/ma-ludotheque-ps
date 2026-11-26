@@ -8,12 +8,16 @@ import { Login } from "./components/Login";
 import { BuySearch } from "./components/BuySearch";
 import { CollectionValue } from "./components/CollectionValue";
 import { ScanAll } from "./components/ScanAll";
+import { BuySheet } from "./components/BuySheet";
+import { WishlistContext, type WishlistApi } from "./components/WishlistContext";
+import { WishlistGrid } from "./components/WishlistGrid";
 import { DiscSpinner, Logo } from "./components/Logo";
 import { generatedCover } from "./lib/canvasArt";
 import { mix } from "./lib/artUtils";
 import { PLATFORMS, PLATFORM_ORDER } from "./lib/platforms";
-import { fetchScans } from "./lib/covers";
+import { fetchScans, saveCover } from "./lib/covers";
 import { activeLoans } from "./lib/loans";
+import { addWish, alertFor, listWishlist, removeWish, updateWish, wishPrices, type WishItem, type WishPrice } from "./lib/wishlist";
 import { addGame, deleteGame, listGames, updateGame } from "./lib/store";
 import { isDemo, supabase } from "./lib/supabase";
 import type { Game, NewGame, Platform } from "./lib/types";
@@ -26,6 +30,8 @@ const DEMO_SEED: Array<Pick<NewGame, "title" | "platform" | "release_year" | "pe
   { title: "Neon Drift", platform: "ps5", release_year: 2023, pegi: 7, genres: ["Course"], publisher: "Studio Démo", summary: "Jeu de démonstration : des courses de nuit dans une ville en néon." },
   { title: "Les Terres d'Aube", platform: "ps4", release_year: 2019, pegi: 16, genres: ["Aventure", "RPG"], publisher: "Studio Démo", summary: "Jeu de démonstration : un voyage au long cours vers l'aube." },
   { title: "Canyon Run", platform: "ps3", release_year: 2011, pegi: 12, genres: ["Action"], publisher: "Studio Démo", summary: "Jeu de démonstration : une course-poursuite dans les canyons." },
+  { title: "Pixel Kart", platform: "switch", release_year: 2022, pegi: 3, genres: ["Course"], publisher: "Studio Démo", summary: "Jeu de démonstration : des courses de karts en famille." },
+  { title: "Orbital Strike", platform: "xseries", release_year: 2025, pegi: 16, genres: ["Tir"], publisher: "Studio Démo", summary: "Jeu de démonstration : un combat spatial en orbite basse." },
 ];
 
 let seededInMemory = false;
@@ -51,7 +57,11 @@ export default function App() {
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<Platform | "all" | "loaned">("all");
+  const [filter, setFilter] = useState<Platform | "all" | "loaned" | "wishlist">("all");
+  const [wishlist, setWishlist] = useState<WishItem[]>([]);
+  const [wishPricesMap, setWishPrices] = useState<Map<string, WishPrice>>(new Map());
+  // Fiche d'achat ouverte depuis la liste d'envies.
+  const [wishOpen, setWishOpen] = useState<WishItem | null>(null);
   const [q, setQ] = useState("");
   // Raccourci de l'icône d'appli (« Ranger un jeu ») : ?ajouter=1 ouvre directement l'ajout.
   const [adding, setAdding] = useState(() => new URLSearchParams(window.location.search).has("ajouter"));
@@ -101,8 +111,25 @@ export default function App() {
     if (signedIn) void refresh();
   }, [signedIn, refresh]);
 
+  // Liste d'envies et prix du moment (bons plans) : au démarrage, puis toutes les 30 minutes.
+  const refreshWishes = useCallback(async () => {
+    try {
+      const items = await listWishlist();
+      setWishlist(items);
+      setWishPrices(await wishPrices(items));
+    } catch {
+      // la liste d'envies est secondaire : la collection reste utilisable
+    }
+  }, []);
+  useEffect(() => {
+    if (!signedIn) return;
+    void refreshWishes();
+    const t = window.setInterval(() => void refreshWishes(), 30 * 60 * 1000);
+    return () => window.clearInterval(t);
+  }, [signedIn, refreshWishes]);
+
   const counts = useMemo(() => {
-    const c: Record<Platform, number> = { ps3: 0, ps4: 0, ps5: 0 };
+    const c = Object.fromEntries(PLATFORM_ORDER.map((p) => [p, 0])) as Record<Platform, number>;
     games.forEach((g) => c[g.platform]++);
     return c;
   }, [games]);
@@ -111,7 +138,7 @@ export default function App() {
 
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    const base = filter === "loaned" ? loans : games.filter((g) => filter === "all" || g.platform === filter);
+    const base = filter === "loaned" ? loans : filter === "wishlist" ? [] : games.filter((g) => filter === "all" || g.platform === filter);
     return base.filter((g) => !needle || g.title.toLowerCase().includes(needle));
   }, [games, loans, filter, q]);
 
@@ -125,6 +152,59 @@ export default function App() {
   }
   const select = (g: Game) => setSelectedId(g.id);
 
+  /** Range un nouveau jeu, l'ouvre, puis va chercher ses vrais scans en tâche de fond. */
+  async function addNew(g: NewGame) {
+    const created = await addGame(g);
+    setGames((list) => [created, ...list]);
+    open(created);
+    // Vrais scans du dos et du disque (LaunchBox) en tâche de fond : un échec ne gêne pas l'ajout.
+    if (!isDemo)
+      fetchScans(created)
+        .then((patch) => (Object.keys(patch).length ? updateGame(created.id, patch) : null))
+        .then((updated) => {
+          if (!updated) return;
+          setGames((list) => list.map((x) => (x.id === updated.id ? updated : x)));
+          setViewing((v) => (v && v.game.id === updated.id ? { ...v, game: updated } : v));
+        })
+        .catch(() => undefined);
+  }
+
+  const wishApi: WishlistApi = {
+    items: wishlist,
+    prices: wishPricesMap,
+    add: async (c, pf, max, best) => {
+      const item = await addWish(c, pf, max, best);
+      setWishlist((l) => [item, ...l]);
+      setWishPrices((m) => new Map(m).set(item.id, { best: null, alert: null }));
+      void refreshWishes();
+    },
+    remove: async (id) => {
+      await removeWish(id);
+      setWishlist((l) => l.filter((w) => w.id !== id));
+    },
+    update: async (id, patch) => {
+      const item = await updateWish(id, patch);
+      setWishlist((l) => l.map((w) => (w.id === id ? item : w)));
+      setWishPrices((m) => {
+        const p = m.get(id);
+        return p ? new Map(m).set(id, { ...p, alert: alertFor(item, p.best) }) : m;
+      });
+    },
+    bought: async (w, c, pf) => {
+      const { url, screenshots } = await saveCover(c, pf);
+      setWishOpen(null);
+      await addNew({
+        title: c.name, platform: pf, igdb_id: c.igdb_id, cover_url: url, release_year: c.year, summary: c.summary,
+        publisher: c.publisher, genres: c.genres, pegi: c.pegi, screenshots, back_url: null, disc_url: null,
+      });
+      if (w) {
+        await removeWish(w.id).catch(() => undefined);
+        setWishlist((l) => l.filter((x) => x.id !== w.id));
+      }
+    },
+  };
+  const alerts = wishlist.filter((w) => wishPricesMap.get(w.id)?.alert);
+
   if (!authReady)
     return (
       <div className="splash" role="status" aria-label="Chargement">
@@ -135,6 +215,7 @@ export default function App() {
   if (!signedIn) return <Login />;
 
   return (
+    <WishlistContext.Provider value={wishApi}>
     <div className="app" style={{ ["--tint" as string]: tint, ["--tint-soft" as string]: mix(tint, "#07090f", 0.55), ["--tint-hi" as string]: mix(tint, "#ffffff", 0.45) }}>
       <Backdrop game={loading ? null : selected} />
       <a className="skip" href="#collection">
@@ -182,7 +263,7 @@ export default function App() {
             {!browsing && selected && <Hero game={selected} onOpen={open} />}
 
             <nav className="filters" aria-label="Plateforme">
-              {(["all", ...PLATFORM_ORDER] as const).map((f) => (
+              {(["all", ...PLATFORM_ORDER.filter((p) => counts[p] > 0 || filter === p)] as const).map((f) => (
                 <button key={f} aria-pressed={filter === f} className={filter === f ? "on" : ""} onClick={() => setFilter(f)}>
                   {f === "all" ? "Tout" : PLATFORMS[f].label}
                   <span className="mono">{f === "all" ? games.length : counts[f]}</span>
@@ -194,7 +275,25 @@ export default function App() {
                   <span className="mono">{loans.length}</span>
                 </button>
               )}
+              <button aria-pressed={filter === "wishlist"} className={`${filter === "wishlist" ? "on" : ""} ${alerts.length ? "has-alert" : ""}`} onClick={() => setFilter("wishlist")}>
+                Envies
+                <span className="mono">{wishlist.length}</span>
+              </button>
             </nav>
+
+            {!browsing && alerts.length > 0 && (
+              <section className="scan-all wish-alert" role="status">
+                <p>
+                  🔔 <strong>{alerts.length} jeu{alerts.length > 1 ? "x" : ""} de ta liste d'envies</strong>{" "}
+                  {alerts.length > 1 ? "ont" : "a"} un prix en baisse ou sous ton prix max :{" "}
+                  {alerts.slice(0, 3).map((w) => w.title).join(", ")}
+                  {alerts.length > 3 ? "…" : ""}
+                </p>
+                <button className="btn" onClick={() => setFilter("wishlist")}>
+                  Voir mes envies
+                </button>
+              </section>
+            )}
 
             {!browsing && (
               <CollectionValue
@@ -213,7 +312,13 @@ export default function App() {
               />
             )}
 
-            {browsing ? (
+            {filter === "wishlist" ? (
+              <WishlistGrid
+                items={wishlist.filter((w) => !q.trim() || w.title.toLowerCase().includes(q.trim().toLowerCase()))}
+                prices={wishPricesMap}
+                onOpen={setWishOpen}
+              />
+            ) : browsing ? (
               shown.length === 0 ? (
                 <div className="state-msg">
                   <p>
@@ -240,7 +345,7 @@ export default function App() {
               )
             ) : null}
             {browsing && filter !== "loaned" && q.trim() !== "" && (
-              <BuySearch query={q} games={games} initialPlatform={filter === "all" ? "ps5" : filter} onOpenOwned={(g) => open(g)} />
+              <BuySearch query={q} games={games} initialPlatform={filter === "all" || filter === "wishlist" ? "ps5" : filter} onOpenOwned={(g) => open(g)} />
             )}
             {browsing ? null : (
               <>
@@ -271,21 +376,25 @@ export default function App() {
           onClose={() => setAdding(false)}
           existing={games}
           onOpenExisting={open}
-          onAdd={async (g) => {
-            const created = await addGame(g);
-            setGames((list) => [created, ...list]);
-            open(created);
-            // Vrais scans du dos et du disque (LaunchBox) en tâche de fond : un échec ne gêne pas l'ajout.
-            if (!isDemo)
-              fetchScans(created)
-                .then((patch) => (Object.keys(patch).length ? updateGame(created.id, patch) : null))
-                .then((updated) => {
-                  if (!updated) return;
-                  setGames((list) => list.map((x) => (x.id === updated.id ? updated : x)));
-                  setViewing((v) => (v && v.game.id === updated.id ? { ...v, game: updated } : v));
-                })
-                .catch(() => undefined);
+          onAdd={addNew}
+        />
+      )}
+
+      {wishOpen && (
+        <BuySheet
+          candidate={
+            wishOpen.candidate ?? {
+              igdb_id: wishOpen.igdb_id, name: wishOpen.title, year: null, thumb_url: wishOpen.thumb_url ?? "", image_id: null,
+              summary: null, publisher: null, genres: [], screenshot_ids: [], pegi: null,
+            }
+          }
+          platform={wishOpen.platform}
+          owned={null}
+          onOpenOwned={(g) => {
+            setWishOpen(null);
+            open(g);
           }}
+          onClose={() => setWishOpen(null)}
         />
       )}
 
@@ -316,5 +425,6 @@ export default function App() {
         </Suspense>
       )}
     </div>
+    </WishlistContext.Provider>
   );
 }

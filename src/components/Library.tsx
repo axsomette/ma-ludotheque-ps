@@ -79,7 +79,7 @@ export function Hero({ game, onOpen }: { game: Game; onOpen: OpenGame }) {
           </button>
           <button className="btn" onClick={() => onOpen(game, "disc")}>
             <IconDisc />
-            Sortir le disque
+            {PLATFORMS[game.platform].media === "cart" ? "Sortir la cartouche" : "Sortir le disque"}
           </button>
         </div>
       </div>
@@ -190,7 +190,7 @@ export function EmptyLibrary({ onAdd }: { onAdd: () => void }) {
         <IconPlus width={36} height={36} />
       </button>
       <h2>Aucun jeu pour l'instant</h2>
-      <p>Photographie la jaquette d'un jeu PS5, PS4 ou PS3 : la jaquette officielle est retrouvée et le boîtier arrive ici, prêt à être ouvert.</p>
+      <p>Photographie la jaquette d'un jeu PlayStation, Switch ou Xbox : la jaquette officielle est retrouvée et le boîtier arrive ici, prêt à être ouvert.</p>
       <button className="btn primary" onClick={onAdd}>
         Ranger mon premier jeu
       </button>

@@ -8,6 +8,7 @@ import { BuyOffers } from "./BuyOffers";
 import { IconClose } from "./icons";
 import { DiscSpinner } from "./Logo";
 import { Ps5Panel } from "./Ps5Panel";
+import { WishPanel } from "./WishPanel";
 
 interface Props {
   candidate: CoverCandidate;
@@ -106,6 +107,8 @@ export function BuySheet({ candidate, platform, owned, onOpenOwned, onClose }: P
             )}
           </div>
         </div>
+
+        <WishPanel candidate={candidate} platform={platform} owned={!!owned} currentBest={deals?.find((d) => !d.is_expired)?.price ?? null} />
 
         <section className="photos market" aria-labelledby="buy-deals-title">
           <h3 id="buy-deals-title">Prix par boutique</h3>

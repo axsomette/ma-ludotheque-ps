@@ -32,3 +32,13 @@ describe("ps5Info", () => {
     expect(ps5Info({ title: "Red Dead Redemption 2", platform: "ps4" })?.headline).toBe("Pas de mise à niveau PS5 connue");
   });
 });
+
+describe("autres consoles", () => {
+  it("Switch → Switch 2, Xbox One / 360 → Series, dernière génération sans section", () => {
+    expect(ps5Info({ title: "Zelda", platform: "switch" })?.section).toBe("Sur Switch 2");
+    expect(ps5Info({ title: "Halo 5", platform: "xone" })?.tone).toBe("good");
+    expect(ps5Info({ title: "Halo 3", platform: "x360" })?.tone).toBe("warn");
+    expect(ps5Info({ title: "Mario Kart World", platform: "switch2" })).toBeNull();
+    expect(ps5Info({ title: "Starfield", platform: "xseries" })).toBeNull();
+  });
+});

@@ -1,4 +1,5 @@
 import { functionMessage } from "./covers";
+import { PLATFORMS } from "./platforms";
 import { supabase } from "./supabase";
 import type { Condition, Edition, Game, GamePatch } from "./types";
 
@@ -114,7 +115,7 @@ export const euros = (n: number, digits = 0) =>
 
 /** Page de recherche PriceCharting (consultation par l'utilisateur ; leurs prix ne peuvent pas être repris dans l'appli). */
 export function priceChartingUrl(g: Pick<Game, "title" | "platform">): string {
-  return `https://www.pricecharting.com/fr/search-products?type=prices&q=${encodeURIComponent(`${g.title} PAL ${g.platform.toUpperCase()}`)}`;
+  return `https://www.pricecharting.com/fr/search-products?type=prices&q=${encodeURIComponent(`${g.title} PAL ${PLATFORMS[g.platform].label}`)}`;
 }
 
 /** « 12,5 » ou « 12.50 » → 12.5 ; vide → null ; invalide → undefined. */
@@ -127,11 +128,19 @@ export function parseEuros(s: string): number | null | undefined {
 
 /** Boutiques françaises reconnues : recherche du jeu en un clic. */
 export function storeLinks(g: Pick<Game, "title" | "platform">): Array<{ name: string; kind: string; url: string }> {
-  const label = g.platform.toUpperCase();
+  const label = PLATFORMS[g.platform].label;
   const q = encodeURIComponent(`${g.title} ${label}`);
   const qt = encodeURIComponent(g.title);
+  // Boutique numérique officielle de la console.
+  const family = PLATFORMS[g.platform].family;
+  const digital =
+    family === "nintendo"
+      ? { name: "Nintendo eShop", kind: "Numérique officiel", url: `https://www.nintendo.com/fr-fr/Rechercher/Rechercher-299117.html?q=${qt}` }
+      : family === "xbox"
+        ? { name: "Microsoft Store", kind: "Numérique officiel", url: `https://www.xbox.com/fr-FR/search?q=${qt}` }
+        : { name: "PlayStation Store", kind: "Numérique officiel", url: `https://store.playstation.com/fr-fr/search/${qt}` };
   return [
-    { name: "PlayStation Store", kind: "Numérique officiel", url: `https://store.playstation.com/fr-fr/search/${qt}` },
+    digital,
     { name: "Fnac", kind: "Physique", url: `https://www.fnac.com/SearchResult/ResultList.aspx?Search=${q}` },
     { name: "Micromania", kind: "Physique · neuf et occasion", url: `https://www.micromania.fr/search?q=${q}` },
     { name: "E.Leclerc", kind: "Physique", url: `https://www.e.leclerc/recherche?q=${q}` },

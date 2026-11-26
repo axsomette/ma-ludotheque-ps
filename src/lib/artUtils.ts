@@ -74,6 +74,10 @@ export function metaLine(parts: Array<string | number | null | undefined>): stri
 export function isBandPixel(r: number, g: number, b: number, platform: Platform): boolean {
   if (platform === "ps5") return r > 200 && g > 200 && b > 200 && Math.max(r, g, b) - Math.min(r, g, b) < 30;
   if (platform === "ps4") return b > 140 && b - r > 70 && b - g > 30;
+  // Bandeau rouge des jaquettes Switch / Switch 2, vert des jaquettes Xbox One.
+  if (platform === "switch" || platform === "switch2") return r > 170 && g < 70 && b < 80;
+  if (platform === "xone") return g > 100 && g - r > 50 && g - b > 50;
+  if (platform !== "ps3") return false;
   return Math.max(r, g, b) < 62;
 }
 

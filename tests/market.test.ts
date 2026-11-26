@@ -105,3 +105,14 @@ describe("valeur de la collection", () => {
     expect(v).toMatchObject({ total: 70, low: 65, high: 75, valued: 2, count: 3, spent: 60 });
   });
 });
+
+describe("nouvelles consoles", () => {
+  it("Switch, Switch 2 et Xbox ne se confondent pas", () => {
+    expect(matches(L("Mario Kart World Switch 2 neuf", 60), "Mario Kart World", "switch2", "standard")).toBe(true);
+    expect(matches(L("Mario Kart World Switch 2 neuf", 60), "Mario Kart World", "switch", "standard")).toBe(false);
+    expect(matches(L("Mario Kart 8 Deluxe Nintendo Switch", 40), "Mario Kart 8 Deluxe", "switch", "standard")).toBe(true);
+    expect(matches(L("Halo 3 Xbox 360 complet", 8), "Halo 3", "x360", "standard")).toBe(true);
+    expect(matches(L("Forza Horizon 5 Xbox Series X", 30), "Forza Horizon 5", "xone", "standard")).toBe(false);
+    expect(matches(L("Carte eShop 50€ + Mario Kart World Switch 2", 50), "Mario Kart World", "switch2", "standard")).toBe(false);
+  });
+});

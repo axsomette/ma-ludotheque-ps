@@ -1,4 +1,4 @@
-export type Platform = "ps3" | "ps4" | "ps5";
+export type Platform = "ps3" | "ps4" | "ps5" | "switch" | "switch2" | "x360" | "xone" | "xseries";
 export type Pegi = 3 | 7 | 12 | 16 | 18;
 
 /** Un jeu physique de la collection. */

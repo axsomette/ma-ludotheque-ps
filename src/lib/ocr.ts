@@ -11,7 +11,7 @@ export interface OcrResult {
 // Lignes entières sans rapport avec le titre : mentions légales, site web, PEGI, Blu-ray…
 const NOISE_LINE = /(©|\bwww\b|\.com|\bpegi\b|blu-?ray|only on|exclusivit|playstation network)/i;
 // Mots du bandeau imprimés sur toutes les jaquettes.
-const NOISE_WORD = /^(PS[345]|PLAYSTATION|ONLY|SONY|ENTERTAINMENT|NETWORK|VR)$/i;
+const NOISE_WORD = /^(PS[345]|PLAYSTATION|ONLY|SONY|ENTERTAINMENT|NETWORK|VR|NINTENDO|SWITCH|XBOX|360|MICROSOFT)$/i;
 
 /**
  * Extrait un titre probable du texte brut lu sur la jaquette.

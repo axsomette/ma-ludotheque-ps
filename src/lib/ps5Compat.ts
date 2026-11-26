@@ -23,6 +23,8 @@ export function findUpgrade(title: string, list: readonly Ps5Upgrade[] = PS5_UPG
 
 export interface Ps5Info {
   tone: "good" | "warn" | "bad" | "info";
+  /** Titre de la section : « Sur PS5 », « Sur Switch 2 », « Sur Xbox Series ». */
+  section: string;
   headline: string;
   details: string[];
 }
@@ -38,11 +40,48 @@ const HEADLINE: Record<UpgradeStatus, { tone: Ps5Info["tone"]; text: string }> =
   expired: { tone: "bad", text: "Offre de mise à niveau PS5 terminée" },
 };
 
-/** Ce qu'un jeu PS3 ou PS4 donne sur PS5. null pour un jeu PS5. */
+/**
+ * Ce que donne un jeu sur la console de génération suivante : PS3/PS4 → PS5, Switch → Switch 2,
+ * Xbox 360/One → Xbox Series X|S. null pour un jeu de la dernière génération.
+ */
 export function ps5Info(g: Pick<Game, "title" | "platform">): Ps5Info | null {
-  if (g.platform === "ps5") return null;
+  if (g.platform === "ps5" || g.platform === "switch2" || g.platform === "xseries") return null;
+  if (g.platform === "switch") {
+    return {
+      tone: "good",
+      section: "Sur Switch 2",
+      headline: "Se lance sur Switch 2",
+      details: [
+        "La Switch 2 lit les cartouches Switch : presque tous les jeux Switch y fonctionnent (Nintendo publie la liste des rares exceptions).",
+        "Certains jeux ont une « Nintendo Switch 2 Edition » ou une mise à jour gratuite qui les améliore sur Switch 2 : vérifie sur le Nintendo eShop.",
+      ],
+    };
+  }
+  if (g.platform === "xone") {
+    return {
+      tone: "good",
+      section: "Sur Xbox Series",
+      headline: "Se lance sur Xbox Series X",
+      details: [
+        "Les disques Xbox One fonctionnent sur Xbox Series X (avec lecteur) ; la Series S, sans lecteur, ne les lit pas.",
+        "Beaucoup de jeux ont une version Series gratuite (« Smart Delivery ») : elle s'installe d'elle-même si le jeu y a droit.",
+      ],
+    };
+  }
+  if (g.platform === "x360") {
+    return {
+      tone: "warn",
+      section: "Sur Xbox Series",
+      headline: "Jouable seulement s'il est rétrocompatible",
+      details: [
+        "Environ 600 jeux Xbox 360 se lancent sur Xbox One et Xbox Series X avec le disque, d'après la liste officielle de Microsoft.",
+        "Vérifie ce jeu dans la liste de rétrocompatibilité Xbox avant de compter dessus. La Series S, sans lecteur, ne lit pas les disques.",
+      ],
+    };
+  }
   if (g.platform === "ps3") {
     return {
+      section: "Sur PS5",
       tone: "bad",
       headline: "Ne se lance pas sur PS4 ni sur PS5",
       details: [
@@ -55,6 +94,7 @@ export function ps5Info(g: Pick<Game, "title" | "platform">): Ps5Info | null {
   const base = "Le disque PS4 se lance sur PS5 (rétrocompatibilité), à de très rares exceptions près.";
   if (!u) {
     return {
+      section: "Sur PS5",
       tone: "info",
       headline: "Pas de mise à niveau PS5 connue",
       details: [base, "Ce jeu n'est pas dans la liste des mises à niveau PS5 (relevée sur Push Square et MeinMMO). Elle se met à jour à la main : vérifie sur le PlayStation Store en cas de doute."],
@@ -63,5 +103,5 @@ export function ps5Info(g: Pick<Game, "title" | "platform">): Ps5Info | null {
   const h = HEADLINE[u.status];
   const details = [u.note, base].filter((x): x is string => !!x);
   if (u.status === "free" || u.status === "conditional") details.push(DISC_RULE);
-  return { tone: h.tone, headline: h.text, details };
+  return { section: "Sur PS5", tone: h.tone, headline: h.text, details };
 }

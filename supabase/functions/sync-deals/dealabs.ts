@@ -1,7 +1,9 @@
 // Lecture des flux RSS publics de Dealabs (bons plans : jeu, boutique, prix). Module pur, testé avec Vitest,
 // inclus tel quel dans la fonction sync-deals.
 
-export type Platform = "ps3" | "ps4" | "ps5";
+import { platformOf, type Platform } from "../_shared/platforms.ts";
+export { platformOf };
+export type { Platform };
 
 export interface Deal {
   id: string; // « dealabs:<numéro du bon plan> », unique
@@ -27,6 +29,10 @@ export const FEEDS: Array<{ url: string; platform: Platform | null }> = [
   { url: "https://www.dealabs.com/rss/groupe/jeux-playstation-4", platform: "ps4" },
   { url: "https://www.dealabs.com/rss/groupe/playstation-5", platform: "ps5" },
   { url: "https://www.dealabs.com/rss/groupe/playstation-4", platform: "ps4" },
+  { url: "https://www.dealabs.com/rss/groupe/jeux-nintendo-switch", platform: null },
+  { url: "https://www.dealabs.com/rss/groupe/nintendo-switch-2", platform: "switch2" },
+  { url: "https://www.dealabs.com/rss/groupe/jeux-xbox-series-x", platform: null },
+  { url: "https://www.dealabs.com/rss/groupe/jeux-xbox-one", platform: null },
   { url: "https://www.dealabs.com/rss/groupe/jeux-video", platform: null },
 ];
 
@@ -66,15 +72,7 @@ export function searchVariants(title: string): string[] {
   return [...new Set([t, arabic, roman])].slice(0, 3);
 }
 
-/** Plateforme d'après le titre du bon plan (PS5 avant PS4 : « PS4/PS5 » compte comme PS5). */
-export function platformOf(title: string): Platform | null {
-  if (/\b(ps ?5|playstation ?5)\b/i.test(title)) return "ps5";
-  if (/\b(ps ?4|playstation ?4)\b/i.test(title)) return "ps4";
-  if (/\b(ps ?3|playstation ?3)\b/i.test(title)) return "ps3";
-  return null;
-}
-
-/** Bons plans d'un flux RSS Dealabs. Seuls ceux qui concernent une console PlayStation sont gardés. */
+/** Bons plans d'un flux RSS Dealabs. Seuls ceux qui concernent une console gérée sont gardés. */
 export function parseFeed(xml: string, feedPlatform: Platform | null): Deal[] {
   const out: Deal[] = [];
   for (const it of xml.match(/<item>[\s\S]*?<\/item>/g) ?? []) {
@@ -108,7 +106,7 @@ export function parseFeed(xml: string, feedPlatform: Platform | null): Deal[] {
 /**
  * Bons plans d'une page de recherche Dealabs (https://www.dealabs.com/search?q=…). Chaque bon plan y est décrit
  * par un composant (attribut data-vue3) dont les propriétés « thread » donnent titre, prix, boutique, date et statut.
- * Seuls les bons plans PlayStation sont gardés.
+ * Seuls les bons plans des consoles gérées sont gardés.
  */
 export function parseSearch(html: string): Deal[] {
   const out: Deal[] = [];

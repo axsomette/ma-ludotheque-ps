@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { searchCovers } from "../lib/covers";
 import { findDuplicate } from "../lib/duplicates";
-import { PLATFORMS, PLATFORM_ORDER } from "../lib/platforms";
+import { PLATFORMS } from "../lib/platforms";
 import type { CoverCandidate, Game, Platform } from "../lib/types";
 import { BuySheet } from "./BuySheet";
 import { IconSearch } from "./icons";
 import { DiscSpinner } from "./Logo";
+import { PlatformPicker } from "./PlatformPicker";
 
 interface Props {
   query: string;
@@ -50,22 +51,13 @@ export function BuySearch({ query, games, initialPlatform, onOpenOwned }: Props)
         Acheter « {q} » au meilleur prix
       </h2>
       <div className="buy-search-row">
-        <div className="segmented small-seg" role="radiogroup" aria-label="Plateforme">
-          {PLATFORM_ORDER.map((pf) => (
-            <button
-              key={pf}
-              role="radio"
-              aria-checked={platform === pf}
-              className={platform === pf ? "on" : ""}
-              onClick={() => {
-                setPlatform(pf);
-                if (results) void run(pf);
-              }}
-            >
-              {PLATFORMS[pf].label}
-            </button>
-          ))}
-        </div>
+        <PlatformPicker
+          value={platform}
+          onChange={(pf) => {
+            setPlatform(pf);
+            if (results) void run(pf);
+          }}
+        />
         <button className="btn primary" onClick={() => void run()} disabled={busy}>
           {busy ? <DiscSpinner size={20} /> : <IconSearch />}
           {results && !stale ? "Relancer" : "Chercher les prix"}

@@ -6,7 +6,7 @@ import { dominantColor } from "../lib/canvasArt";
 import { coverSrc } from "./Library";
 import { fetchDetails, fetchScans, needsDetails, ScansUnavailable, uploadPhoto, type PhotoKind } from "../lib/covers";
 import { isDemo } from "../lib/supabase";
-import { PLATFORMS } from "../lib/platforms";
+import { mediaName, PLATFORMS } from "../lib/platforms";
 import { frenchDate, isLoaned, since, today } from "../lib/loans";
 import { pruneFiles, updateGame } from "../lib/store";
 import type { Game } from "../lib/types";
@@ -62,6 +62,10 @@ export function Viewer({ game, initialMode = "front", onClose, onDelete, onUpdat
   const discInput = useRef<HTMLInputElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const p = PLATFORMS[game.platform];
+  // « disque » ou « cartouche » selon la console.
+  const media = mediaName(game.platform);
+  const Media = media[0].toUpperCase() + media.slice(1);
+  const modes = MODES.map((m) => (m.id === "disc" ? { ...m, label: Media } : m));
 
   useEffect(() => {
     let alive = true;
@@ -97,7 +101,7 @@ export function Viewer({ game, initialMode = "front", onClose, onDelete, onUpdat
     setBusy(kind);
     setError(null);
     try {
-      const url = await uploadPhoto(file, kind);
+      const url = await uploadPhoto(file, kind, kind === "disc" && media === "disque");
       const previous = kind === "back" ? game.back_url : game.disc_url;
       const updated = await updateGame(game.id, kind === "back" ? { back_url: url } : { disc_url: url });
       onUpdate(updated);
@@ -149,15 +153,15 @@ export function Viewer({ game, initialMode = "front", onClose, onDelete, onUpdat
     try {
       const patch = await fetchScans(game);
       if (!Object.keys(patch).length) {
-        setScanNote("Aucun scan de dos ou de disque trouvé pour ce jeu sur LaunchBox. Tu peux photographier les tiens.");
+        setScanNote(`Aucun scan de dos ou de ${media} trouvé pour ce jeu sur LaunchBox. Tu peux photographier les tiens.`);
         return;
       }
       const updated = await updateGame(game.id, patch);
       onUpdate(updated);
       changeMode(patch.back_url ? "back" : "disc");
       // Ce qui manque encore : on le dit, plutôt que de laisser le bouton sans explication.
-      if (!updated.disc_url) setScanNote("Dos récupéré. Pas de scan du disque pour ce jeu sur LaunchBox : photographie le tien si tu veux.");
-      else if (!updated.back_url) setScanNote("Disque récupéré. Pas de scan du dos pour ce jeu sur LaunchBox : photographie le tien si tu veux.");
+      if (!updated.disc_url) setScanNote(`Dos récupéré. Pas de scan de la ${media === "disque" ? "face du disque" : "cartouche"} sur LaunchBox : photographie le tien si tu veux.`);
+      else if (!updated.back_url) setScanNote(`${Media} récupéré${media === "cartouche" ? "e" : ""}. Pas de scan du dos pour ce jeu sur LaunchBox : photographie le tien si tu veux.`);
     } catch (e) {
       if (e instanceof ScansUnavailable) setScanNote(e.message);
       else setError((e as Error).message);
@@ -207,7 +211,7 @@ export function Viewer({ game, initialMode = "front", onClose, onDelete, onUpdat
         </button>
 
         <div className="mode-bar" role="toolbar" aria-label="Manipuler le boîtier">
-          {MODES.map(({ id, label, Icon }) => (
+          {modes.map(({ id, label, Icon }) => (
             <button key={id} className={`mode ${mode === id ? "on" : ""}`} aria-pressed={mode === id} onClick={() => changeMode(id)}>
               <Icon />
               <span>{label}</span>
@@ -217,10 +221,10 @@ export function Viewer({ game, initialMode = "front", onClose, onDelete, onUpdat
         <p className="stage-hint">
           {mode === "disc"
             ? flipped
-              ? "Face gravée · touche le disque pour le retourner"
-              : "Touche le disque pour voir sa face gravée"
+              ? media === "disque" ? "Face gravée · touche le disque pour le retourner" : "Dos de la cartouche · touche-la pour la retourner"
+              : media === "disque" ? "Touche le disque pour voir sa face gravée" : "Touche la cartouche pour la retourner"
             : mode === "open"
-              ? "Touche le disque pour le sortir · le boîtier pour le refermer"
+              ? media === "disque" ? "Touche le disque pour le sortir · le boîtier pour le refermer" : "Touche la cartouche pour la sortir · le boîtier pour le refermer"
               : "Glisse pour tourner le boîtier · touche-le pour l'ouvrir"}
         </p>
       </div>
@@ -305,7 +309,7 @@ export function Viewer({ game, initialMode = "front", onClose, onDelete, onUpdat
         </section>
 
         <section className="photos" aria-labelledby="photos-title">
-          <h3 id="photos-title">Vrai dos, vrai disque</h3>
+          <h3 id="photos-title">Vrai dos, vrai{media === "cartouche" ? "e cartouche" : " disque"}</h3>
           {!isDemo && (!game.back_url || !game.disc_url) && (
             <>
               <p className="muted small">Récupère les vrais scans sur LaunchBox Games DB, version européenne en priorité.</p>
@@ -324,12 +328,12 @@ export function Viewer({ game, initialMode = "front", onClose, onDelete, onUpdat
             </button>
             <button className="btn" onClick={() => discInput.current?.click()} disabled={busy !== null}>
               <IconDisc />
-              {busy === "disc" ? "Envoi…" : game.disc_url ? "Reprendre le disque" : "Photographier le disque"}
+              {busy === "disc" ? "Envoi…" : game.disc_url ? `Reprendre ${media === "disque" ? "le disque" : "la cartouche"}` : `Photographier ${media === "disque" ? "le disque" : "la cartouche"}`}
             </button>
           </div>
           <input ref={backInput} type="file" accept="image/*" capture="environment" hidden onChange={(e) => onPhoto("back", e.target.files?.[0])} />
           <input ref={discInput} type="file" accept="image/*" capture="environment" hidden onChange={(e) => onPhoto("disc", e.target.files?.[0])} />
-          <p className="muted small">Pour le disque, cadre-le bien au centre : la photo est recadrée en cercle.</p>
+          {media === "disque" && <p className="muted small">Pour le disque, cadre-le bien au centre : la photo est recadrée en cercle.</p>}
         </section>
 
         {error && (

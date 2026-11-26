@@ -1,4 +1,5 @@
 import { matches, type Edition } from "../../supabase/functions/market-price/market";
+import { LABEL, RELATED } from "../../supabase/functions/_shared/platforms";
 import { supabase } from "./supabase";
 import type { Platform } from "./types";
 
@@ -10,9 +11,9 @@ export interface StoreDeal {
   link: string;
   published_at: string;
   is_expired: boolean;
+  platform?: Platform;
 }
 
-const LABEL: Record<Platform, string> = { ps3: "PS3", ps4: "PS4", ps5: "PS5" };
 const DAYS = 90;
 
 /**
@@ -26,8 +27,8 @@ export async function findDeals(title: string, platform: Platform, edition: Edit
   const since = new Date(Date.now() - DAYS * 86_400_000).toISOString();
   const { data, error } = await supabase
     .from("deals")
-    .select("id,title,merchant,price,link,published_at,is_expired")
-    .eq("platform", platform)
+    .select("id,title,merchant,price,link,published_at,is_expired,platform")
+    .in("platform", RELATED[platform])
     .gte("published_at", since)
     .not("price", "is", null)
     .order("published_at", { ascending: false })
@@ -41,7 +42,8 @@ export async function findDeals(title: string, platform: Platform, edition: Edit
  * Les promos en cours d'abord ; s'il n'y en a aucune, les promos terminées servent de repère (is_expired).
  */
 export function bestByMerchant(rows: StoreDeal[], title: string, platform: Platform, edition: Edition): StoreDeal[] {
-  const mine = rows.filter((r) => matches({ title: `${r.title} ${LABEL[platform]}` }, title, platform, edition));
+  // Un bon plan sans console dans son titre (flux d'une console précise) reçoit celle de sa ligne.
+  const mine = rows.filter((r) => matches({ title: `${r.title} ${LABEL[r.platform ?? platform]}` }, title, platform, edition));
   const active = mine.filter((r) => !r.is_expired);
   return cheapestPerMerchant(active.length ? active : mine);
 }

@@ -22,7 +22,7 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
 }
 
 // Logotypes officiels des bandeaux : PS5 noir, PS4 et PS3 blancs (teintés au besoin).
-const WORDMARK_SRC: Record<Platform, string> = {
+const WORDMARK_SRC: Partial<Record<Platform, string>> = {
   ps5: `${import.meta.env.BASE_URL}brand/consoles/ps5-wordmark.png`,
   ps4: `${import.meta.env.BASE_URL}brand/consoles/ps4-wordmark.png`,
   ps3: `${import.meta.env.BASE_URL}brand/consoles/ps3-wordmark.png`,
@@ -37,7 +37,7 @@ function wordmarksReady(): Promise<void> {
   if (typeof document === "undefined") return Promise.resolve();
   wordmarksLoading ??= Promise.all([
     ...(Object.keys(WORDMARK_SRC) as Platform[]).map((p) =>
-      loadImage(WORDMARK_SRC[p])
+      loadImage(WORDMARK_SRC[p]!)
         .then((img) => void (wordmarkImg[p] = img))
         .catch(() => undefined), // logo absent : le texte de secours prend le relais
     ),
@@ -88,6 +88,15 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 /** Part de la hauteur occupée par le bandeau de plateforme sur une jaquette européenne. */
 const BAND = 0.105;
 
+/** Taille du canvas d'une face de jaquette, aux proportions du boîtier de la console (hauteur 1368 px). */
+function sheet(platform: Platform): { W: number; H: number } {
+  const { w, h } = PLATFORMS[platform].size;
+  const H = 1368;
+  return { W: Math.round((H * (w - 0.05)) / (h - 0.05)), H };
+}
+
+const isPs = (p: Platform) => PLATFORMS[p].family === "playstation";
+
 /**
  * Logotype officiel de la plateforme, hauteur `height`, centré verticalement sur y.
  * `ink` recolore le logo (« silver » : dégradé argenté du PS3) ; sans logo chargé, le nom est écrit en secours.
@@ -109,7 +118,7 @@ function drawWordmark(
     ctx.textBaseline = "middle";
     ctx.font = `600 ${height * 1.25}px ${DISPLAY}`;
     ctx.letterSpacing = `${height * 0.2}px`;
-    ctx.fillText(PLATFORMS[platform].label, x, y);
+    ctx.fillText(PLATFORMS[platform].bandLabel, x, y);
     ctx.restore();
     return;
   }
@@ -139,6 +148,23 @@ function drawWordmark(
  * PS3 noir laqué à lettrage argent, avec « PlayStation Network » à droite.
  */
 function drawBand(ctx: CanvasRenderingContext2D, platform: Platform, w: number, h: number) {
+  if (!isPs(platform)) {
+    // Nintendo et Xbox : bandeau à la couleur de la console, nom de la console en texte (aucun logo reproduit).
+    const p = PLATFORMS[platform];
+    const g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, mix(p.bandColor, "#ffffff", platform === "x360" ? 0.25 : 0.08));
+    g.addColorStop(1, mix(p.bandColor, "#000000", 0.18));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+    ctx.save();
+    ctx.fillStyle = p.bandText;
+    ctx.textBaseline = "middle";
+    ctx.font = `700 ${h * 0.34}px ${DISPLAY}`;
+    ctx.letterSpacing = `${h * 0.05}px`;
+    ctx.fillText(p.bandLabel, h * 0.42, h * 0.52);
+    ctx.restore();
+    return;
+  }
   if (platform === "ps5") {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, w, h);
@@ -301,7 +327,7 @@ function bandFraction(img: Img, platform: Platform): number {
  * mentions d'origine en pied). Illustration seule : on compose tout le pied européen (PEGI, pastille, éditeur).
  */
 export async function frontCover(game: Game): Promise<HTMLCanvasElement> {
-  const W = 1080, H = 1368;
+  const { W, H } = sheet(game.platform);
   const c = document.createElement("canvas");
   c.width = W; c.height = H;
   const ctx = c.getContext("2d")!;
@@ -339,7 +365,7 @@ export async function frontCover(game: Game): Promise<HTMLCanvasElement> {
   ctx.fillStyle = shade;
   ctx.fillRect(0, H - 300, W, 300);
   drawPegi(ctx, game.pegi, 48, foot - 170, 130);
-  if (game.platform !== "ps3") drawInfoPill(ctx, "CONNEXION INTERNET REQUISE", game.pegi ? 210 : 48, foot - 64, 52, game.platform === "ps4" ? "#3d8bff" : "rgba(255,255,255,.8)");
+  if (game.platform === "ps4" || game.platform === "ps5") drawInfoPill(ctx, "CONNEXION INTERNET REQUISE", game.pegi ? 210 : 48, foot - 64, 52, game.platform === "ps4" ? "#3d8bff" : "rgba(255,255,255,.8)");
   if (game.publisher) {
     ctx.fillStyle = "rgba(255,255,255,.92)";
     ctx.font = `700 30px ${BODY}`;
@@ -360,7 +386,8 @@ export function spineTexture(game: Game, base: string): HTMLCanvasElement {
   const c = document.createElement("canvas");
   c.width = W; c.height = H;
   const ctx = c.getContext("2d")!;
-  const body = game.platform === "ps5" ? base : "#0b0b0d";
+  const p = PLATFORMS[game.platform];
+  const body = game.platform === "ps5" ? base : isPs(game.platform) ? "#0b0b0d" : mix(p.caseColor, "#000000", 0.35);
   const g = ctx.createLinearGradient(0, 0, W, 0);
   g.addColorStop(0, mix(body, "#000000", 0.25));
   g.addColorStop(0.5, body);
@@ -373,23 +400,31 @@ export function spineTexture(game: Game, base: string): HTMLCanvasElement {
     const b = ctx.createLinearGradient(0, 0, W, 0);
     b.addColorStop(0, "#00246a"); b.addColorStop(0.5, "#0b52c9"); b.addColorStop(1, "#00246a");
     ctx.fillStyle = b;
-  } else {
+  } else if (game.platform === "ps3") {
     const b = ctx.createLinearGradient(0, 0, W, 0);
     b.addColorStop(0, "#2a2b30"); b.addColorStop(1, "#000000");
     ctx.fillStyle = b;
-  }
-  ctx.fillRect(0, 0, W, top);
+  } else ctx.fillStyle = p.bandColor;
+  const top2 = isPs(game.platform) ? top : 300;
+  ctx.fillRect(0, 0, W, top2);
   ctx.save();
-  ctx.translate(W / 2, top / 2);
+  ctx.translate(W / 2, top2 / 2);
   ctx.rotate(Math.PI / 2);
-  drawWordmark(ctx, game.platform, 0, 0, 26, game.platform === "ps5" ? "#000000" : "#e9ebf0", "center");
+  if (isPs(game.platform)) drawWordmark(ctx, game.platform, 0, 0, 26, game.platform === "ps5" ? "#000000" : "#e9ebf0", "center");
+  else {
+    ctx.fillStyle = p.bandText;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = `700 26px ${DISPLAY}`;
+    ctx.fillText(p.bandLabel, 0, 0);
+  }
   ctx.restore();
   ctx.save();
-  ctx.translate(W / 2 + 14, top + 34);
+  ctx.translate(W / 2 + 14, top2 + 34);
   ctx.rotate(Math.PI / 2);
   ctx.fillStyle = "#ffffff";
   ctx.font = `700 40px ${DISPLAY}`;
-  const [line] = wrapText(game.title.toUpperCase(), H - top - 190, (s) => ctx.measureText(s).width, 1);
+  const [line] = wrapText(game.title.toUpperCase(), H - top2 - 190, (s) => ctx.measureText(s).width, 1);
   ctx.fillText(line ?? "", 0, 0);
   ctx.restore();
   // PEGI en pied de tranche, comme sur les boîtiers européens
@@ -435,7 +470,7 @@ function legalStrip(ctx: CanvasRenderingContext2D, game: Game, y: number, W: num
  * européenne de la plateforme, avec les vraies données du jeu (captures, résumé, genres, PEGI, éditeur).
  */
 export async function backCover(game: Game, tint: string): Promise<HTMLCanvasElement> {
-  const W = 1080, H = 1368;
+  const { W, H } = sheet(game.platform);
   const c = document.createElement("canvas");
   c.width = W; c.height = H;
   const ctx = c.getContext("2d")!;
@@ -562,8 +597,10 @@ export async function backCover(game: Game, tint: string): Promise<HTMLCanvasEle
   }
 
   // PS3 : fond noir, trois captures en haut, texte, PEGI et pictogrammes argentés, bande claire.
+  // Nintendo et Xbox reprennent cette mise en page, teintée de la couleur de la console.
   const g = ctx.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, "#1b1c21");
+  const base3 = isPs(game.platform) ? "#1b1c21" : mix(PLATFORMS[game.platform].caseColor, "#0b0c10", 0.72);
+  g.addColorStop(0, base3);
   g.addColorStop(1, "#050506");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
@@ -579,7 +616,7 @@ export async function backCover(game: Game, tint: string): Promise<HTMLCanvasEle
   const stripY = H - 230;
   const featY = stripY - 150;
   drawPegi(ctx, game.pegi, pad, featY, 100);
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < Math.min(5, Math.floor((W - pad * 2 - 130) / 128)); i++) {
     const fx = pad + 130 + i * 128;
     const fg = ctx.createLinearGradient(0, featY, 0, featY + 110);
     fg.addColorStop(0, "#eceef2");
@@ -595,9 +632,12 @@ export async function backCover(game: Game, tint: string): Promise<HTMLCanvasEle
   ctx.fillStyle = "#ffffff";
   ctx.font = `700 24px ${BODY}`;
   ctx.fillText("2", pad + 17, H - 43);
-  ctx.fillStyle = "#0b5fc4";
-  ctx.font = `italic 700 24px ${BODY}`;
-  ctx.fillText("Blu-ray Disc", pad + 64, H - 43);
+  if (game.platform === "ps3" || game.platform === "xone" || game.platform === "xseries") {
+    ctx.fillStyle = "#0b5fc4";
+    ctx.font = `italic 700 24px ${BODY}`;
+    ctx.fillText("Blu-ray Disc", pad + 64, H - 43);
+  }
+  if (!isPs(game.platform)) drawBand(ctx, game.platform, W, 44);
   return c;
 }
 
@@ -651,14 +691,17 @@ export async function discLabel(game: Game): Promise<HTMLCanvasElement> {
     g.addColorStop(1, "#0a3a96");
     ctx.fillStyle = g;
     ctx.fillRect(0, top, S, S - top);
-  } else {
+  } else if (game.platform === "ps3") {
     ctx.fillStyle = "#060607";
     ctx.fillRect(0, top, S, S - top);
     ctx.fillStyle = "#5a5d66";
     ctx.fillRect(0, top - 3, S, 3);
+  } else {
+    ctx.fillStyle = PLATFORMS[game.platform].bandColor;
+    ctx.fillRect(0, top, S, S - top);
   }
-  const ink = game.platform === "ps5" ? "#000000" : "#eef0f5";
-  drawWordmark(ctx, game.platform, R, top + 64, 40, ink, "center");
+  const ink = game.platform === "ps5" ? "#000000" : isPs(game.platform) ? "#eef0f5" : PLATFORMS[game.platform].bandText;
+  drawWordmark(ctx, game.platform, R, top + 64, isPs(game.platform) ? 40 : 30, ink, "center");
   ctx.fillStyle = game.platform === "ps5" ? "rgba(0,0,0,.4)" : "rgba(255,255,255,.4)";
   ctx.fillRect(R - 200, top + 118, 400, 4);
   ctx.fillRect(R - 150, top + 132, 300, 4);
@@ -673,6 +716,53 @@ export async function discLabel(game: Game): Promise<HTMLCanvasElement> {
   ctx.beginPath();
   ctx.arc(R, R, R * 0.33, 0, Math.PI * 2);
   ctx.fill();
+  ctx.restore();
+  return c;
+}
+
+/**
+ * Étiquette de la cartouche Switch : illustration du jeu, bandeau rouge avec le nom de la console,
+ * titre en pied (ou la photo de l'utilisateur si elle existe).
+ */
+export async function cartLabel(game: Game): Promise<HTMLCanvasElement> {
+  const W = 420, H = 620;
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "#2a2b30";
+  ctx.fillRect(0, 0, W, H);
+  if (game.disc_url) {
+    try {
+      drawCover(ctx, await loadImage(game.disc_url), 0, 0, W, H);
+      return c;
+    } catch {
+      // photo illisible : on génère l'étiquette
+    }
+  }
+  await fontsReady();
+  const m = 26, top = 150, bottom = H - 40;
+  roundRect(ctx, m, top - 60, W - m * 2, bottom - top + 60, 18);
+  ctx.save();
+  ctx.clip();
+  try {
+    const img = await loadImage(game.cover_url ?? generatedCover(game.title, game.platform));
+    drawCover(ctx, img, m, top, W - m * 2, bottom - top - 90);
+  } catch {
+    ctx.fillStyle = "#c9ccd6";
+    ctx.fillRect(m, top, W - m * 2, bottom - top);
+  }
+  ctx.fillStyle = PLATFORMS[game.platform].bandColor;
+  ctx.fillRect(m, top - 60, W - m * 2, 60);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = `700 22px ${DISPLAY}`;
+  ctx.textBaseline = "middle";
+  ctx.fillText(PLATFORMS[game.platform].bandLabel, m + 18, top - 30);
+  ctx.fillStyle = "#f2f3f5";
+  ctx.fillRect(m, bottom - 90, W - m * 2, 90);
+  ctx.fillStyle = "#16171b";
+  ctx.font = `700 26px ${DISPLAY}`;
+  const [t1] = wrapText(game.title.toUpperCase(), W - m * 2 - 30, (x) => ctx.measureText(x).width, 1);
+  ctx.fillText(t1 ?? "", m + 15, bottom - 45);
   ctx.restore();
   return c;
 }

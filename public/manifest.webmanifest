@@ -1,7 +1,7 @@
 {
   "name": "Ma ludothèque",
   "short_name": "Ludothèque",
-  "description": "Mes jeux PS5, PS4 et PS3 physiques, rangés sur une étagère, en boîtiers 3D qui s'ouvrent.",
+  "description": "Mes jeux PlayStation, Switch et Xbox physiques, rangés sur une étagère, en boîtiers 3D qui s'ouvrent.",
   "lang": "fr",
   "id": "./",
   "start_url": "./",

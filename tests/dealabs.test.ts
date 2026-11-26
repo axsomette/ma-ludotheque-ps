@@ -25,7 +25,12 @@ describe("Dealabs", () => {
   it("plateforme", () => {
     expect(platformOf("Jeu PS4/PS5")).toBe("ps5");
     expect(platformOf("Jeu sur PlayStation 4")).toBe("ps4");
-    expect(platformOf("Jeu Switch")).toBeNull();
+    expect(platformOf("Mario Kart World sur Switch 2")).toBe("switch2");
+    expect(platformOf("Zelda Tears of the Kingdom sur Nintendo Switch")).toBe("switch");
+    expect(platformOf("Elden Ring sur Xbox One & Series X")).toBe("xseries");
+    expect(platformOf("Gears of War 2 sur Xbox One")).toBe("xone");
+    expect(platformOf("Halo 3 Xbox 360")).toBe("x360");
+    expect(platformOf("Jeu PC (Steam)")).toBeNull();
   });
   it("lit les bons plans PlayStation d'un flux, avec boutique, prix et date", () => {
     const d = parseFeed(XML, null);
@@ -74,14 +79,15 @@ describe("recherche Dealabs", () => {
     expect(threadId("https://www.dealabs.com/bons-plans/gta-vi-3469009")).toBe("3469009");
     expect(threadId("https://www.dealabs.com/share-deal/3456528")).toBe("3456528");
   });
-  it("lit les bons plans PlayStation d'une page de recherche, avec statut", () => {
+  it("lit les bons plans d'une page de recherche, avec console et statut", () => {
     const html =
       vue({ title: "Code Vein II sur PS5", price: 21.99, merchant: { merchantName: "Micromania Zing" }, publishedAt: 1794698611, shareableLink: "https://www.dealabs.com/share-deal/3455763", isExpired: false }) +
       vue({ title: "CODE VEIN II sur Xbox Series X", price: 29.99, merchant: { merchantName: "Cdiscount" }, publishedAt: 1794707333, shareableLink: "https://www.dealabs.com/share-deal/3455821", isExpired: false }) +
       vue({ title: "Jeu Code Vein II sur PS5", price: 34.99, merchant: { merchantName: "Amazon" }, publishedAt: 1794000000, shareableLink: "https://www.dealabs.com/share-deal/3362155", isExpired: true });
-    expect(parseSearch(html).map((d) => [d.id, d.merchant, d.price, d.is_expired])).toEqual([
-      ["dealabs:3455763", "Micromania Zing", 21.99, false],
-      ["dealabs:3362155", "Amazon", 34.99, true],
+    expect(parseSearch(html).map((d) => [d.id, d.merchant, d.price, d.is_expired, d.platform])).toEqual([
+      ["dealabs:3455763", "Micromania Zing", 21.99, false, "ps5"],
+      ["dealabs:3455821", "Cdiscount", 29.99, false, "xseries"],
+      ["dealabs:3362155", "Amazon", 34.99, true, "ps5"],
     ]);
   });
 });
