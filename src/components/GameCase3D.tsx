@@ -1,8 +1,9 @@
-import { useGLTF, useTexture } from "@react-three/drei";
+import { RoundedBox, useGLTF, useTexture } from "@react-three/drei";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { backCover, cartLabel, discDataSide, discLabel, fontsReady, frontCover, generatedCover, spineTexture } from "../lib/canvasArt";
+import { LOW_POWER } from "../lib/perf";
 import { PLATFORMS } from "../lib/platforms";
 import type { Game, Platform } from "../lib/types";
 
@@ -11,8 +12,10 @@ const W0 = 1.35;
 const H0 = 1.71;
 const D0 = 0.15;
 const T = 0.016; // épaisseur du plastique
-// Cartouche Switch : 31 × 21 × 3,3 mm, posée dans son logement en haut à droite du boîtier.
+// Cartouche Switch / Switch 2 (même format) : 21 × 31 × 3,3 mm, debout dans son support en bas du boîtier.
 const CART = { w: 0.21, h: 0.31, d: 0.033 };
+/** Hauteur du centre de la cartouche dans son support, depuis le bas du boîtier. */
+const CART_FROM_BOTTOM = 0.3;
 const OPEN_ANGLE = -2.75; // ≈ 158°, presque à plat comme un vrai boîtier
 const DISC_R = 0.6; // disque de 120 mm
 const HOLE_R = 0.075;
@@ -46,11 +49,12 @@ function useCaseShell(platform: Platform) {
         normalScale: new THREE.Vector2(0.3, 0.3),
         clearcoat: outer ? 1 : 0.7,
         clearcoatRoughness: outer ? 0.08 : 0.18,
-        transmission: p.translucency,
+        // Sur téléphone, pas de transmission (rendu en deux passes) : une simple transparence suffit.
+        transmission: LOW_POWER ? 0 : p.translucency,
         thickness: 0.03,
         ior: 1.49,
         transparent: p.translucency > 0,
-        opacity: p.translucency > 0 ? 0.92 : 1,
+        opacity: p.translucency > 0 ? (LOW_POWER ? 1 - p.translucency * 0.35 : 0.92) : 1,
       });
       mesh.material = m;
       mesh.castShadow = true;
@@ -98,7 +102,7 @@ export function GameCase3D({ game, mode, discFlipped, tint, onCaseClick, onDiscC
   const { w: W, h: H, d: D } = style.size;
   const isCart = style.media === "cart";
   const shellScale: [number, number, number] = [W / W0, H / H0, D / D0];
-  const rest: [number, number, number] = isCart ? [W / 2 - 0.22, H / 2 - 0.36, -D / 2 + T + CART.d / 2 + 0.004] : [0, 0.04, discRestZ(D)];
+  const rest: [number, number, number] = isCart ? [0, -H / 2 + CART_FROM_BOTTOM, CART.d / 2 + 0.004] : [0, 0.04, discRestZ(D)];
 
   const [front, setFront] = useState<THREE.Texture | null>(null);
   const [back, setBack] = useState<THREE.Texture | null>(null);
@@ -174,9 +178,13 @@ export function GameCase3D({ game, mode, discFlipped, tint, onCaseClick, onDiscC
         {...hover}
       >
         {/* coque Blender : plateau, tranche à double charnière, moyeu à pétales, arcs de maintien */}
-        <group scale={shellScale}>
-          <primitive object={shell.base} />
-        </group>
+        {isCart ? (
+          <NintendoBase platform={game.platform} />
+        ) : (
+          <group scale={shellScale}>
+            <primitive object={shell.base} />
+          </group>
+        )}
         {/* jaquette arrière, sous le film transparent */}
         <mesh position={[0, 0, -D / 2 - 0.0012]} rotation={[0, Math.PI, 0]}>
           <planeGeometry args={[W - 0.05, H - 0.05]} />
@@ -200,16 +208,7 @@ export function GameCase3D({ game, mode, discFlipped, tint, onCaseClick, onDiscC
         {...hover}
       >
         {isCart ? (
-          // Cartouche : étiquette sur la face avant, plastique sombre ailleurs, encoche en haut.
-          <mesh castShadow>
-            <boxGeometry args={[CART.w, CART.h, CART.d]} />
-            <meshStandardMaterial attach="material-0" color="#26272b" roughness={0.6} />
-            <meshStandardMaterial attach="material-1" color="#26272b" roughness={0.6} />
-            <meshStandardMaterial attach="material-2" color="#2b2c31" roughness={0.6} />
-            <meshStandardMaterial attach="material-3" color="#26272b" roughness={0.6} />
-            <meshPhysicalMaterial attach="material-4" key={label ? label.uuid : "blank"} map={label ?? undefined} color={label ? "#ffffff" : "#d5d9e2"} roughness={0.35} clearcoat={0.5} />
-            <meshStandardMaterial attach="material-5" color="#1d1e22" roughness={0.7} />
-          </mesh>
+          <GameCard label={label} color={style.cardColor ?? "#36373c"} />
         ) : (
           <>
         <mesh position={[0, 0, DISC_T / 2]} castShadow>
@@ -263,9 +262,13 @@ export function GameCase3D({ game, mode, discFlipped, tint, onCaseClick, onDiscC
         {...hover}
       >
         {/* coque Blender : couvercle, lèvre d'emboîtement, attaches à livret */}
-        <group scale={shellScale}>
-          <primitive object={shell.lid} />
-        </group>
+        {isCart ? (
+          <NintendoLid platform={game.platform} />
+        ) : (
+          <group scale={shellScale}>
+            <primitive object={shell.lid} />
+          </group>
+        )}
         {/* jaquette avant sous le film transparent */}
         <mesh position={[W / 2 + 0.006, 0, T / 2 + 0.0012]}>
           <planeGeometry args={[W - 0.05, H - 0.05]} />
@@ -274,4 +277,123 @@ export function GameCase3D({ game, mode, discFlipped, tint, onCaseClick, onDiscC
       </group>
     </group>
   );
+}
+
+/** Plastique d'un boîtier Nintendo : transparent (Switch) ou rouge (Switch 2). */
+function NintendoPlastic({ platform }: { platform: Platform }) {
+  const p = PLATFORMS[platform];
+  const clear = p.translucency > 0;
+  return (
+    <meshPhysicalMaterial
+      color={p.caseColor}
+      roughness={clear ? 0.12 : 0.42}
+      clearcoat={clear ? 1 : 0.5}
+      clearcoatRoughness={0.1}
+      transparent={clear}
+      opacity={clear ? 0.38 : 1}
+      depthWrite={!clear}
+    />
+  );
+}
+
+/**
+ * Moitié arrière d'un boîtier Switch / Switch 2 (aucun moyeu à disque) : coque, fond intérieur
+ * (dos de la jaquette papier sous le plastique transparent, ou plastique rouge sur Switch 2)
+ * et support de cartouche en bas, au centre.
+ */
+function NintendoBase({ platform }: { platform: Platform }) {
+  const { w: W, h: H, d: D } = PLATFORMS[platform].size;
+  const p = PLATFORMS[platform];
+  const cy = -H / 2 + CART_FROM_BOTTOM;
+  const wall = 0.014;
+  const fw = CART.w + 0.016;
+  const fh = CART.h + 0.016;
+  const holder = p.translucency > 0 ? "#cfd8e2" : mix3(p.caseColor, 0.82);
+  return (
+    <group>
+      <RoundedBox args={[W, H, D / 2]} radius={0.028} smoothness={3} position={[0, 0, -D / 4]} castShadow receiveShadow>
+        <NintendoPlastic platform={platform} />
+      </RoundedBox>
+      <mesh position={[0, 0, 0.0012]} receiveShadow>
+        <planeGeometry args={[W - 0.07, H - 0.07]} />
+        <meshStandardMaterial color={p.caseInner} roughness={0.8} />
+      </mesh>
+      {/* support de cartouche : cadre à quatre bords, ouvert en haut pour la saisir */}
+      {[
+        [0, cy - fh / 2, fw + wall, wall],
+        [-fw / 2, cy - 0.02, wall, fh - 0.04],
+        [fw / 2, cy - 0.02, wall, fh - 0.04],
+      ].map(([x, y, w, h], i) => (
+        <mesh key={i} position={[x, y, 0.012]} castShadow>
+          <boxGeometry args={[w, h, 0.022]} />
+          <meshStandardMaterial color={holder} roughness={0.4} transparent={p.translucency > 0} opacity={p.translucency > 0 ? 0.75 : 1} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+/** Couvercle d'un boîtier Nintendo (origine sur la charnière), avec les attaches de la notice. */
+function NintendoLid({ platform }: { platform: Platform }) {
+  const { w: W, h: H, d: D } = PLATFORMS[platform].size;
+  const p = PLATFORMS[platform];
+  const zc = -D / 4 + T / 2; // centre de la coque dans le repère du couvercle
+  const inner = zc - D / 4 - 0.0012; // face intérieure
+  const tab = p.translucency > 0 ? "#cfd8e2" : mix3(p.caseColor, 0.82);
+  return (
+    <group>
+      <RoundedBox args={[W, H, D / 2]} radius={0.028} smoothness={3} position={[W / 2, 0, zc]} castShadow receiveShadow>
+        <NintendoPlastic platform={platform} />
+      </RoundedBox>
+      <mesh position={[W / 2, 0, inner]} rotation={[0, Math.PI, 0]}>
+        <planeGeometry args={[W - 0.07, H - 0.07]} />
+        <meshStandardMaterial color={p.caseInner} roughness={0.8} />
+      </mesh>
+      {/* attaches de la notice, en haut et en bas */}
+      {[H / 2 - 0.1, -H / 2 + 0.1].map((y) => (
+        <mesh key={y} position={[W / 2, y, inner - 0.008]}>
+          <boxGeometry args={[0.2, 0.03, 0.016]} />
+          <meshStandardMaterial color={tab} roughness={0.4} transparent={p.translucency > 0} opacity={p.translucency > 0 ? 0.75 : 1} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+/**
+ * Cartouche Switch / Switch 2 : corps arrondi (gris foncé ou rouge), bord de prise strié en haut,
+ * étiquette à l'avant, contacts dorés en bas au dos.
+ */
+function GameCard({ label, color }: { label: THREE.Texture | null; color: string }) {
+  const { w, h, d } = CART;
+  return (
+    <group>
+      <RoundedBox args={[w, h, d]} radius={0.008} smoothness={3} castShadow>
+        <meshStandardMaterial color={color} roughness={0.55} />
+      </RoundedBox>
+      {/* bord de prise : fines stries au-dessus de l'étiquette */}
+      {[0, 1, 2].map((i) => (
+        <mesh key={i} position={[0, h / 2 - 0.016 - i * 0.008, d / 2 + 0.0004]}>
+          <planeGeometry args={[w - 0.05, 0.0025]} />
+          <meshStandardMaterial color={mix3(color, 0.7)} roughness={0.6} />
+        </mesh>
+      ))}
+      <mesh position={[0, -0.016, d / 2 + 0.0006]}>
+        <planeGeometry args={[w - 0.024, h - 0.072]} />
+        <meshPhysicalMaterial key={label ? label.uuid : "blank"} map={label ?? undefined} color={label ? "#ffffff" : "#d5d9e2"} roughness={0.35} clearcoat={0.4} />
+      </mesh>
+      {/* contacts dorés, en bas au dos */}
+      <mesh position={[0, -h / 2 + 0.03, -d / 2 - 0.0006]} rotation={[0, Math.PI, 0]}>
+        <planeGeometry args={[w * 0.7, 0.026]} />
+        <meshStandardMaterial color="#c8a24c" metalness={0.85} roughness={0.3} />
+      </mesh>
+    </group>
+  );
+}
+
+/** Teinte plus sombre (k < 1) d'une couleur hexadécimale. */
+function mix3(hex: string, k: number): string {
+  const c = new THREE.Color(hex);
+  c.multiplyScalar(k);
+  return `#${c.getHexString()}`;
 }

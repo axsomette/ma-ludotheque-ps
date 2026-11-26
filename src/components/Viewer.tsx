@@ -5,6 +5,8 @@ import { metaLine, mix } from "../lib/artUtils";
 import { dominantColor } from "../lib/canvasArt";
 import { coverSrc } from "./Library";
 import { fetchDetails, fetchScans, needsDetails, ScansUnavailable, uploadPhoto, type PhotoKind } from "../lib/covers";
+import { optimizeImages } from "../lib/optimize";
+import { LOW_POWER } from "../lib/perf";
 import { isDemo } from "../lib/supabase";
 import { mediaName, PLATFORMS } from "../lib/platforms";
 import { frenchDate, isLoaned, since, today } from "../lib/loans";
@@ -146,6 +148,20 @@ export function Viewer({ game, initialMode = "front", onClose, onDelete, onUpdat
     }
   }
 
+  // Images trop lourdes (scans de plusieurs Mo) réduites une fois pour toutes, après l'affichage du boîtier.
+  useEffect(() => {
+    if (isDemo) return;
+    let alive = true;
+    const t = window.setTimeout(() => {
+      void optimizeImages(game).then((g) => alive && g && onUpdate(g));
+    }, 2500);
+    return () => {
+      alive = false;
+      window.clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game.id, game.cover_url, game.back_url, game.disc_url]);
+
   async function realScans() {
     setBusy("scans");
     setError(null);
@@ -177,10 +193,11 @@ export function Viewer({ game, initialMode = "front", onClose, onDelete, onUpdat
   return (
     <div className="viewer" role="dialog" aria-modal="true" aria-labelledby="viewer-title" style={{ ["--glow" as string]: glow }}>
       <div className="viewer-stage">
-        <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 0.25, 5.6], fov: 32 }} gl={{ antialias: true, alpha: true, preserveDrawingBuffer: import.meta.env.DEV }}>
+        {/* Téléphone : ni ombres portées ni rendu au-delà de 1,5× la résolution (bien plus fluide, même rendu à l'œil). */}
+        <Canvas shadows={!LOW_POWER} dpr={LOW_POWER ? [1, 1.5] : [1, 2]} camera={{ position: [0, 0.25, 5.6], fov: 32 }} gl={{ antialias: true, alpha: true, powerPreference: "high-performance", preserveDrawingBuffer: import.meta.env.DEV }}>
           {/* Éclairage studio produit : lumière principale douce de face, contre-jour teinté, débouchage. */}
           <ambientLight intensity={0.9} />
-          <directionalLight position={[2.5, 3.5, 6]} intensity={3.1} castShadow shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004} />
+          <directionalLight position={[2.5, 3.5, 6]} intensity={3.1} castShadow={!LOW_POWER} shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004} />
           <directionalLight position={[-5, 1.5, 3]} intensity={1.2} color="#dfe6ff" />
           <directionalLight position={[-3, 2, -4]} intensity={1.4} color={mix(tint, "#ffffff", 0.35)} />
           <Suspense fallback={null}>
@@ -195,14 +212,14 @@ export function Viewer({ game, initialMode = "front", onClose, onDelete, onUpdat
               />
             </PresentationControls>
             {/* éclairage studio généré localement : aucun fichier HDR à télécharger */}
-            <Environment resolution={256}>
+            <Environment resolution={LOW_POWER ? 64 : 256}>
               <Lightformer form="rect" intensity={4.2} position={[0, 4, 4]} scale={[9, 2, 1]} />
               <Lightformer form="rect" intensity={2.4} position={[0, -1, 6]} scale={[8, 1.2, 1]} />
               <Lightformer form="rect" intensity={1.6} color={mix(tint, "#ffffff", 0.5)} position={[-5, 1, 1]} scale={[3, 6, 1]} />
               <Lightformer form="ring" intensity={2.2} position={[4, 1, 3]} scale={2} />
             </Environment>
           </Suspense>
-          <ContactShadows position={[0, -1.02, 0]} opacity={0.5} scale={7} blur={2.8} far={2.6} />
+          <ContactShadows position={[0, -1.02, 0]} opacity={0.5} scale={7} blur={2.8} far={2.6} resolution={LOW_POWER ? 256 : 512} />
           <FitCamera />
         </Canvas>
 

@@ -179,7 +179,13 @@ input::placeholder { color: #6c7590; }
 .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
 
 /* ---------- Filtres ---------- */
-.filters { display: flex; gap: 4px; margin: 8px 0 4px; border-bottom: 1px solid var(--wire); overflow-x: auto; scrollbar-width: none; }
+.filters {
+  display: flex; gap: 4px; margin: 8px 0 4px; border-bottom: 1px solid var(--wire);
+  /* Défilement horizontal seulement : sans overflow-y caché, la barre bougeait aussi verticalement
+     sur mobile (le soulignement de l'onglet actif dépasse d'un pixel). */
+  overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; touch-action: pan-x pan-y; scrollbar-width: none;
+}
+.filters::-webkit-scrollbar { display: none; }
 .filters button {
   position: relative; display: inline-flex; align-items: baseline; gap: 8px; min-height: 48px; padding: 0 16px; border: none; background: none; cursor: pointer;
   color: var(--muted); font: 600 15px/1 var(--display); letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap;
@@ -187,7 +193,7 @@ input::placeholder { color: #6c7590; }
 .filters button .mono { font-size: 12px; opacity: 0.8; }
 .filters button:hover { color: var(--text); }
 .filters button.on { color: var(--text); }
-.filters button.on::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: -1px; height: 3px; background: var(--tint-hi); transition: background 0.4s; }
+.filters button.on::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: 0; height: 3px; background: var(--tint-hi); transition: background 0.4s; }
 
 /* ---------- Rangées et grille de boîtiers ---------- */
 .rail { margin-top: 24px; }
@@ -198,7 +204,7 @@ input::placeholder { color: #6c7590; }
 .rail-list {
   list-style: none; margin: 0 calc(-1 * var(--gutter)); padding: 14px var(--gutter) 10px;
   display: grid; grid-auto-flow: column; grid-auto-columns: var(--tile-w); gap: 18px;
-  overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: var(--gutter); scrollbar-width: none; overscroll-behavior-x: contain;
+  overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scroll-padding-inline: var(--gutter); scrollbar-width: none; overscroll-behavior-x: contain;
 }
 .rail-list::-webkit-scrollbar { display: none; }
 .rail-list > li { scroll-snap-align: start; }

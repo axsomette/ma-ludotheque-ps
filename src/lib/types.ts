@@ -45,7 +45,7 @@ export type Edition = "standard" | "collector";
 type Optional = "loaned_to" | "loaned_at" | "condition" | "edition" | "value_eur" | "value_low" | "value_high" | "value_n" | "value_at" | "purchase_price" | "manual_value";
 export type NewGame = Omit<Game, "id" | "created_at" | Optional> & Partial<Pick<Game, Optional>>;
 export type GamePatch = Partial<
-  Pick<Game, "back_url" | "disc_url" | "title" | "summary" | "publisher" | "genres" | "pegi" | "screenshots" | "release_year" | Optional>
+  Pick<Game, "cover_url" | "back_url" | "disc_url" | "title" | "summary" | "publisher" | "genres" | "pegi" | "screenshots" | "release_year" | Optional>
 >;
 
 /** Un résultat de recherche de jaquette. */

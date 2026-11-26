@@ -721,15 +721,15 @@ export async function discLabel(game: Game): Promise<HTMLCanvasElement> {
 }
 
 /**
- * Étiquette de la cartouche Switch : illustration du jeu, bandeau rouge avec le nom de la console,
- * titre en pied (ou la photo de l'utilisateur si elle existe).
+ * Étiquette de la face avant d'une cartouche Switch / Switch 2 (proportions 0,78) : illustration du jeu
+ * sur toute la surface, titre et PEGI en pied (ou la photo de l'utilisateur si elle existe).
  */
 export async function cartLabel(game: Game): Promise<HTMLCanvasElement> {
-  const W = 420, H = 620;
+  const W = 468, H = 600;
   const c = document.createElement("canvas");
   c.width = W; c.height = H;
   const ctx = c.getContext("2d")!;
-  ctx.fillStyle = "#2a2b30";
+  ctx.fillStyle = "#c9ccd6";
   ctx.fillRect(0, 0, W, H);
   if (game.disc_url) {
     try {
@@ -740,30 +740,27 @@ export async function cartLabel(game: Game): Promise<HTMLCanvasElement> {
     }
   }
   await fontsReady();
-  const m = 26, top = 150, bottom = H - 40;
-  roundRect(ctx, m, top - 60, W - m * 2, bottom - top + 60, 18);
-  ctx.save();
-  ctx.clip();
   try {
     const img = await loadImage(game.cover_url ?? generatedCover(game.title, game.platform));
-    drawCover(ctx, img, m, top, W - m * 2, bottom - top - 90);
+    // L'illustration sans le bandeau de la jaquette (environ 11 % du haut).
+    const cut = img.height * 0.11;
+    const s = Math.max(W / img.width, H / (img.height - cut));
+    const dw = img.width * s, dh = (img.height - cut) * s;
+    ctx.drawImage(img, 0, cut, img.width, img.height - cut, (W - dw) / 2, (H - dh) / 2, dw, dh);
   } catch {
-    ctx.fillStyle = "#c9ccd6";
-    ctx.fillRect(m, top, W - m * 2, bottom - top);
+    // reste gris
   }
-  ctx.fillStyle = PLATFORMS[game.platform].bandColor;
-  ctx.fillRect(m, top - 60, W - m * 2, 60);
+  const g = ctx.createLinearGradient(0, H * 0.62, 0, H);
+  g.addColorStop(0, "rgba(0,0,0,0)");
+  g.addColorStop(1, "rgba(0,0,0,.78)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, H * 0.62, W, H * 0.38);
   ctx.fillStyle = "#ffffff";
-  ctx.font = `700 22px ${DISPLAY}`;
-  ctx.textBaseline = "middle";
-  ctx.fillText(PLATFORMS[game.platform].bandLabel, m + 18, top - 30);
-  ctx.fillStyle = "#f2f3f5";
-  ctx.fillRect(m, bottom - 90, W - m * 2, 90);
-  ctx.fillStyle = "#16171b";
-  ctx.font = `700 26px ${DISPLAY}`;
-  const [t1] = wrapText(game.title.toUpperCase(), W - m * 2 - 30, (x) => ctx.measureText(x).width, 1);
-  ctx.fillText(t1 ?? "", m + 15, bottom - 45);
-  ctx.restore();
+  ctx.font = `700 34px ${DISPLAY}`;
+  ctx.textBaseline = "alphabetic";
+  const ls = wrapText(game.title.toUpperCase(), W - 150, (x) => ctx.measureText(x).width, 2);
+  ls.forEach((l, i) => ctx.fillText(l, 24, H - 30 - (ls.length - 1 - i) * 38));
+  drawPegi(ctx, game.pegi, W - 96, H - 118, 72);
   return c;
 }
 

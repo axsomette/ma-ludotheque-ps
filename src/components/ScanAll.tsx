@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { fetchScans, ScansQuotaReached } from "../lib/covers";
 import { missingScans, scanAll, type ScanAllProgress, type ScanAllReport } from "../lib/scanAll";
+import { optimizeImages } from "../lib/optimize";
 import { updateGame } from "../lib/store";
 import type { Game } from "../lib/types";
 import { IconDisc } from "./icons";
@@ -40,7 +41,10 @@ export function ScanAll({ games, onUpdated }: Props) {
     try {
       const r = await scanAll(games, {
         fetchScans,
-        updateGame,
+        updateGame: async (id, patch) => {
+          const g = await updateGame(id, patch);
+          return (await optimizeImages(g)) ?? g;
+        },
         isQuota: (e) => e instanceof ScansQuotaReached,
         onProgress: setProgress,
         onUpdated,

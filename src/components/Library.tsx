@@ -51,7 +51,7 @@ export function Hero({ game, onOpen }: { game: Game; onOpen: OpenGame }) {
   return (
     <section className="hero" aria-labelledby="hero-title">
       <button className="hero-case" onClick={() => onOpen(game, "front")} aria-label={`Prendre en main ${game.title}`} key={game.id}>
-        <span className="hc-box" style={{ ["--case" as string]: p.caseColor }}>
+        <span className="hc-box" style={{ ["--case" as string]: p.translucency >= 0.7 ? p.bandColor : p.caseColor }}>
           <span className="hc-front">
             <img src={coverSrc(game)} alt="" crossOrigin="anonymous" />
           </span>
@@ -105,7 +105,7 @@ export function CaseTile({ game, onOpen, onSelect, selected }: TileProps) {
       onFocus={() => onSelect(game)}
       onPointerEnter={(e) => e.pointerType === "mouse" && onSelect(game)}
       aria-label={`${game.title}, ${p.label}${game.release_year ? `, ${game.release_year}` : ""}${loaned ? `, prêté à ${game.loaned_to}` : ""}`}
-      style={{ ["--case" as string]: p.caseColor }}
+      style={{ ["--case" as string]: p.translucency >= 0.7 ? p.bandColor : p.caseColor }}
     >
       <span className="tile-case">
         <img src={coverSrc(game)} alt="" loading="lazy" crossOrigin="anonymous" />

@@ -17,13 +17,15 @@ import { mix } from "./lib/artUtils";
 import { PLATFORMS, PLATFORM_ORDER } from "./lib/platforms";
 import { fetchScans, saveCover } from "./lib/covers";
 import { activeLoans } from "./lib/loans";
+import { optimizeImages } from "./lib/optimize";
 import { addWish, alertFor, listWishlist, removeWish, updateWish, wishPrices, type WishItem, type WishPrice } from "./lib/wishlist";
 import { addGame, deleteGame, listGames, updateGame } from "./lib/store";
 import { isDemo, supabase } from "./lib/supabase";
 import type { Game, NewGame, Platform } from "./lib/types";
 
 // Three.js n'est chargé qu'à l'ouverture d'un boîtier.
-const Viewer = lazy(() => import("./components/Viewer").then((m) => ({ default: m.Viewer })));
+const loadViewer = () => import("./components/Viewer");
+const Viewer = lazy(() => loadViewer().then((m) => ({ default: m.Viewer })));
 
 const DEMO_SEED: Array<Pick<NewGame, "title" | "platform" | "release_year" | "pegi" | "genres" | "publisher" | "summary">> = [
   { title: "Gridiron Legends", platform: "ps5", release_year: 2024, pegi: 3, genres: ["Sport"], publisher: "Studio Démo", summary: "Jeu de démonstration : un match de football américain sous les projecteurs." },
@@ -111,6 +113,15 @@ export default function App() {
     if (signedIn) void refresh();
   }, [signedIn, refresh]);
 
+  // Moteur 3D et modèle du boîtier téléchargés dès que l'accueil est affiché, pendant que l'utilisateur regarde
+  // son étagère : ouvrir un boîtier ne fait plus attendre ce téléchargement (300 Ko compressés).
+  useEffect(() => {
+    if (!signedIn) return;
+    const run = () => void loadViewer().catch(() => undefined);
+    if (typeof window.requestIdleCallback === "function") window.requestIdleCallback(run, { timeout: 4000 });
+    else setTimeout(run, 2500);
+  }, [signedIn]);
+
   // Liste d'envies et prix du moment (bons plans) : au démarrage, puis toutes les 30 minutes.
   const refreshWishes = useCallback(async () => {
     try {
@@ -160,7 +171,8 @@ export default function App() {
     // Vrais scans du dos et du disque (LaunchBox) en tâche de fond : un échec ne gêne pas l'ajout.
     if (!isDemo)
       fetchScans(created)
-        .then((patch) => (Object.keys(patch).length ? updateGame(created.id, patch) : null))
+        .then((patch) => (Object.keys(patch).length ? updateGame(created.id, patch) : created))
+        .then((g) => optimizeImages(g).then((o) => o ?? (g === created ? null : g)))
         .then((updated) => {
           if (!updated) return;
           setGames((list) => list.map((x) => (x.id === updated.id ? updated : x)));
