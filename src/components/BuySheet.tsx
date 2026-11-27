@@ -168,7 +168,7 @@ export function BuySheet({ candidate, platform, owned, onOpenOwned, onClose }: P
           )}
           {busy ? (
             <p className="value-line muted" role="status">
-              <DiscSpinner size={18} /> Recherche des prix sur eBay France…
+              <DiscSpinner size={18} /> Recherche des prix…
             </p>
           ) : note ? (
             <p className="muted small">{note}</p>
@@ -182,7 +182,11 @@ export function BuySheet({ candidate, platform, owned, onOpenOwned, onClose }: P
                   </li>
                 ))}
               </ul>
-              <p className="muted small">D'après {result?.listings ?? 0} annonces eBay France, prix demandés hors aberrations.</p>
+              <p className="muted small">
+                {result?.source === "dealabs"
+                  ? `Estimation d'après ${result.listings} prix neufs repérés sur Dealabs, avec une décote d'occasion selon l'état.`
+                  : `D'après ${result?.listings ?? 0} annonces eBay France, prix demandés hors aberrations.`}
+              </p>
             </>
           )}
           <a className="text-btn" href={priceChartingUrl(game)} target="_blank" rel="noopener noreferrer">

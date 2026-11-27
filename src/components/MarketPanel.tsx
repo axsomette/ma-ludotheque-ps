@@ -14,7 +14,7 @@ interface Props {
 const WEEK = 7 * 86_400_000;
 const CONFIDENCE = { high: "fiable", medium: "indicative", low: "à prendre avec prudence" } as const;
 
-/** Cote du jeu (eBay France) selon son état et son édition, et prix personnels. */
+/** Cote du jeu (eBay France, ou estimation d'après les prix Dealabs) selon son état et son édition, et prix personnels. */
 export function MarketPanel({ game, onUpdate }: Props) {
   const [result, setResult] = useState<MarketResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -108,7 +108,7 @@ export function MarketPanel({ game, onUpdate }: Props) {
 
         {busy ? (
           <p className="value-line muted" role="status">
-            <DiscSpinner size={18} /> Estimation en cours sur eBay France…
+            <DiscSpinner size={18} /> Estimation en cours…
           </p>
         ) : game.value_eur != null ? (
           <div className="value-box">
@@ -120,14 +120,17 @@ export function MarketPanel({ game, onUpdate }: Props) {
               {result?.estimate ? ` · estimation ${CONFIDENCE[result.estimate.confidence]}` : ""}
             </p>
             <p className="muted small">
-              {result?.estimate?.basis ?? `D'après ${game.value_n ?? 0} annonces eBay France`}
+              {result?.estimate?.basis ??
+                (game.value_source === "dealabs"
+                  ? `Estimation d'après ${game.value_n ?? 0} prix repérés sur Dealabs`
+                  : `D'après ${game.value_n ?? 0} annonces eBay France`)}
               {game.value_at ? ` · mise à jour ${since(game.value_at.slice(0, 10))}` : ""}
             </p>
           </div>
         ) : notConfigured ? (
           <p className="muted small">{notConfigured}</p>
         ) : game.value_at ? (
-          <p className="muted small">Pas assez d'annonces sur eBay France pour estimer ce jeu dans cet état.</p>
+          <p className="muted small">Pas encore assez de prix connus pour estimer ce jeu. Ils se complètent chaque heure ; tu peux aussi saisir ta cote ci-dessous.</p>
         ) : (
           <p className="muted small">Pas encore estimé.</p>
         )}

@@ -33,6 +33,8 @@ export interface Game {
   value_high: number | null;
   value_n: number | null;
   value_at: string | null;
+  /** Origine de la dernière cote : eBay, ou estimation d'après les prix Dealabs. */
+  value_source: "ebay" | "dealabs" | null;
   /** Prix payé pour l'exemplaire, et cote saisie à la main (remplace l'estimation dans le total). */
   purchase_price: number | null;
   manual_value: number | null;
@@ -42,7 +44,7 @@ export interface Game {
 export type Condition = "loose" | "cib" | "new";
 export type Edition = "standard" | "collector";
 
-type Optional = "loaned_to" | "loaned_at" | "condition" | "edition" | "value_eur" | "value_low" | "value_high" | "value_n" | "value_at" | "purchase_price" | "manual_value";
+type Optional = "loaned_to" | "loaned_at" | "condition" | "edition" | "value_eur" | "value_low" | "value_high" | "value_n" | "value_at" | "value_source" | "purchase_price" | "manual_value";
 export type NewGame = Omit<Game, "id" | "created_at" | Optional> & Partial<Pick<Game, Optional>>;
 export type GamePatch = Partial<
   Pick<Game, "cover_url" | "back_url" | "disc_url" | "title" | "summary" | "publisher" | "genres" | "pegi" | "screenshots" | "release_year" | Optional>
@@ -67,7 +69,7 @@ export interface CoverCandidate {
 }
 
 export const GAME_COLUMNS =
-  "id,title,platform,igdb_id,cover_url,release_year,summary,publisher,genres,pegi,screenshots,back_url,disc_url,loaned_to,loaned_at,condition,edition,value_eur,value_low,value_high,value_n,value_at,purchase_price,manual_value,created_at";
+  "id,title,platform,igdb_id,cover_url,release_year,summary,publisher,genres,pegi,screenshots,back_url,disc_url,loaned_to,loaned_at,condition,edition,value_eur,value_low,value_high,value_n,value_at,value_source,purchase_price,manual_value,created_at";
 
 /** Complète un jeu ancien (ou de la démo) avec les champs ajoutés depuis. */
 export function normalizeGame(g: Partial<Game> & Pick<Game, "id" | "title" | "platform">): Game {
@@ -89,6 +91,7 @@ export function normalizeGame(g: Partial<Game> & Pick<Game, "id" | "title" | "pl
     value_high: null,
     value_n: null,
     value_at: null,
+    value_source: null,
     purchase_price: null,
     manual_value: null,
     created_at: new Date(0).toISOString(),

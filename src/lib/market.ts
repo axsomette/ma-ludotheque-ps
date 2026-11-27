@@ -1,4 +1,7 @@
 import { functionMessage } from "./covers";
+import { matches } from "../../supabase/functions/market-price/market";
+import { LABEL, RELATED } from "../../supabase/functions/_shared/platforms";
+import { estimateFromDeals } from "./dealsValue";
 import { PLATFORMS } from "./platforms";
 import { supabase } from "./supabase";
 import type { Condition, Edition, Game, GamePatch } from "./types";
@@ -32,9 +35,46 @@ export interface MarketResult {
   offers: { new: Offer[]; used: Offer[] };
   listings: number;
   checked_at: string;
+  /** Origine de la cote : annonces eBay, ou estimation d'après les prix neufs repérés sur Dealabs. */
+  source?: "ebay" | "dealabs";
 }
 
 export class MarketNotConfigured extends Error {}
+
+const DEALS_DAYS = 183;
+
+/**
+ * Cote sans eBay : prix neufs repérés sur Dealabs pour ce jeu (6 derniers mois, promos terminées comprises),
+ * après une recherche ciblée du jeu, puis décote d'occasion selon l'état. Aucun compte ni clé nécessaire.
+ */
+async function dealsMarket(g: Pick<Game, "title" | "platform"> & Partial<Pick<Game, "condition" | "edition">>): Promise<MarketResult> {
+  const sb = supabase!;
+  await sb.functions.invoke("sync-deals", { body: { q: g.title } }).catch(() => undefined);
+  const edition = g.edition ?? "standard";
+  const { data } = await sb
+    .from("deals")
+    .select("title,price,platform")
+    .in("platform", RELATED[g.platform])
+    .gte("published_at", new Date(Date.now() - DEALS_DAYS * 86_400_000).toISOString())
+    .not("price", "is", null)
+    .limit(5000);
+  const prices = ((data ?? []) as Array<{ title: string; price: number; platform: Game["platform"] }>)
+    .filter((r) => matches({ title: `${r.title} ${LABEL[r.platform ?? g.platform]}` }, g.title, g.platform, edition))
+    .map((r) => Number(r.price));
+  const condition = conditionOf({ condition: g.condition ?? null });
+  const estimates = { new: estimateFromDeals(prices, "new"), cib: estimateFromDeals(prices, "cib"), loose: estimateFromDeals(prices, "loose") };
+  return {
+    estimate: estimates[condition],
+    estimates,
+    condition,
+    edition,
+    collector_exists: false,
+    offers: { new: [], used: [] },
+    listings: prices.length,
+    checked_at: new Date().toISOString(),
+    source: "dealabs",
+  };
+}
 export class MarketQuotaReached extends Error {}
 
 export const CONDITIONS: Array<{ id: Condition; label: string; hint: string }> = [
@@ -54,17 +94,18 @@ export async function fetchMarket(g: Pick<Game, "title" | "platform"> & Partial<
   if (error) {
     const status = (error as { context?: Response }).context?.status;
     const msg = await functionMessage(error, "Les prix n'ont pas pu être récupérés. Réessaie dans un instant.");
-    if (status === 503) throw new MarketNotConfigured(msg);
+    // eBay pas encore configuré : estimation d'après les prix Dealabs, sans compte.
+    if (status === 503) return await dealsMarket(g);
     if (status === 429) throw new MarketQuotaReached(msg);
     throw new Error(msg);
   }
-  return data!;
+  return { ...data!, source: "ebay" };
 }
 
 /** Ce qu'il faut enregistrer sur le jeu après une estimation (null partout si rien n'a été trouvé). */
 export function valuePatch(r: MarketResult): GamePatch {
   const e = r.estimate;
-  return { value_eur: e?.value ?? null, value_low: e?.low ?? null, value_high: e?.high ?? null, value_n: e?.n ?? 0, value_at: r.checked_at };
+  return { value_eur: e?.value ?? null, value_low: e?.low ?? null, value_high: e?.high ?? null, value_n: e?.n ?? 0, value_at: r.checked_at, value_source: r.source ?? "ebay" };
 }
 
 /** Valeur retenue pour un jeu : la cote saisie à la main, sinon l'estimation eBay. */
